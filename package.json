@@ -1,0 +1,30 @@
+{
+  "name": "adnify-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Adnify-Cli - a DDD-first AI coding assistant for the terminal",
+  "author": "adnaan",
+  "type": "module",
+  "packageManager": "bun@1.3.6",
+  "bin": {
+    "adnify": "./dist/adnify-cli.js"
+  },
+  "scripts": {
+    "dev": "bun run src/main.tsx",
+    "start": "bun run src/main.tsx",
+    "build": "bun build ./src/main.tsx --outfile ./dist/adnify-cli.js --target bun",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test",
+    "check": "bun test src/domain/session/aggregates/ConversationSession.test.ts"
+  },
+  "dependencies": {
+    "ink": "^4.4.1",
+    "react": "^18.3.1",
+    "react-devtools-core": "^4.19.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "typescript": "^5.7.2"
+  }
+}

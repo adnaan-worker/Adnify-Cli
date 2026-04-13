@@ -1,0 +1,42 @@
+import { describe, expect, test } from 'bun:test'
+import { ConversationSession } from './ConversationSession'
+
+describe('ConversationSession', () => {
+  test('should append messages and update timestamps', () => {
+    const createdAt = new Date('2026-04-13T12:00:00.000Z')
+    const session = ConversationSession.create({
+      id: 'session-1',
+      title: 'demo',
+      mode: 'agent',
+      workspacePath: 'E:/26Project/Adnify-Cli',
+      createdAt,
+    })
+
+    const userTime = new Date('2026-04-13T12:01:00.000Z')
+    session.addUserMessage('message-1', userTime, '你好')
+
+    const assistantTime = new Date('2026-04-13T12:02:00.000Z')
+    session.addAssistantMessage('message-2', assistantTime, '你好，我在。')
+
+    expect(session.getMessages()).toHaveLength(2)
+    expect(session.updatedAt.toISOString()).toBe(assistantTime.toISOString())
+    expect(session.getRecentMessages(1)[0]?.content).toBe('你好，我在。')
+  })
+
+  test('should clear messages without losing session identity', () => {
+    const session = ConversationSession.create({
+      id: 'session-2',
+      title: 'demo',
+      mode: 'chat',
+      workspacePath: 'E:/26Project/Adnify-Cli',
+      createdAt: new Date('2026-04-13T12:00:00.000Z'),
+    })
+
+    session.addSystemMessage('message-3', new Date('2026-04-13T12:01:00.000Z'), 'system')
+    session.clearConversation(new Date('2026-04-13T12:02:00.000Z'))
+
+    expect(session.id).toBe('session-2')
+    expect(session.getMessages()).toHaveLength(0)
+  })
+})
+
