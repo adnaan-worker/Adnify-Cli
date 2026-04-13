@@ -1,6 +1,6 @@
-import { createDefaultToolCatalog } from '../../infrastructure/config/defaultConfig'
 import type { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
 import type { AssistantResponderPort } from '../ports/AssistantResponderPort'
+import type { CliConfigPort } from '../ports/CliConfigPort'
 import type { ClockPort } from '../ports/ClockPort'
 import type { IdGeneratorPort } from '../ports/IdGeneratorPort'
 import type { LoggerPort } from '../ports/LoggerPort'
@@ -26,6 +26,7 @@ export class SubmitPromptUseCase {
     private readonly sessionRepository: SessionRepositoryPort,
     private readonly workspaceContextPort: WorkspaceContextPort,
     private readonly assistantResponder: AssistantResponderPort,
+    private readonly config: CliConfigPort,
     private readonly idGenerator: IdGeneratorPort,
     private readonly clock: ClockPort,
     private readonly logger: LoggerPort,
@@ -53,7 +54,7 @@ export class SubmitPromptUseCase {
       prompt,
       session,
       workspace,
-      toolCatalog: createDefaultToolCatalog(),
+      toolCatalog: this.config.getToolCatalog(),
     })
 
     session.addAssistantMessage(this.idGenerator.next(), this.clock.now(), reply.content)

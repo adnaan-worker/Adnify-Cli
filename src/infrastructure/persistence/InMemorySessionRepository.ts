@@ -19,9 +19,5 @@ export class InMemorySessionRepository implements SessionRepositoryPort {
     const snapshot = this.store.get(sessionId)
     return snapshot ? ConversationSession.rehydrate(snapshot) : null
   }
-
-  async findSnapshotById(sessionId: string): Promise<ConversationSessionSnapshot | null> {
-    return this.store.get(sessionId) ?? null
-  }
 }
 

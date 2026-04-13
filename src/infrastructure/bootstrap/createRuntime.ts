@@ -2,6 +2,7 @@ import { ApplyCliCommandUseCase } from '../../application/use-cases/ApplyCliComm
 import { BootstrapCliUseCase } from '../../application/use-cases/BootstrapCliUseCase'
 import { CreateSessionUseCase } from '../../application/use-cases/CreateSessionUseCase'
 import { SubmitPromptUseCase } from '../../application/use-cases/SubmitPromptUseCase'
+import { DefaultCliConfigAdapter } from '../config/DefaultCliConfigAdapter'
 import { StubAssistantResponder } from '../llm/StubAssistantResponder'
 import { ConsoleLogger } from '../logging/ConsoleLogger'
 import { InMemorySessionRepository } from '../persistence/InMemorySessionRepository'
@@ -24,6 +25,7 @@ export interface AdnifyCliRuntime {
  */
 export function createRuntime(): AdnifyCliRuntime {
   const logger = new ConsoleLogger()
+  const config = new DefaultCliConfigAdapter()
   const sessionRepository = new InMemorySessionRepository()
   const idGenerator = new CryptoIdGenerator()
   const clock = new SystemClock()
@@ -32,12 +34,13 @@ export function createRuntime(): AdnifyCliRuntime {
 
   return {
     useCases: {
-      bootstrapCli: new BootstrapCliUseCase(workspaceContextService, logger),
+      bootstrapCli: new BootstrapCliUseCase(workspaceContextService, config, logger),
       createSession: new CreateSessionUseCase(sessionRepository, idGenerator, clock, logger),
       submitPrompt: new SubmitPromptUseCase(
         sessionRepository,
         workspaceContextService,
         assistantResponder,
+        config,
         idGenerator,
         clock,
         logger,
