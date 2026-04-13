@@ -47,7 +47,7 @@ export class DefaultCliConfigAdapter implements CliConfigPort {
     if (!model) return null
 
     const newConfig: ModelConfig = {
-      provider: 'openai-compatible',
+      provider: provider.provider,
       apiKey: provider.apiKey,
       baseUrl: provider.baseUrl,
       model,

@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import type { ModelConfig, ProvidersMap } from '../../domain/assistant/value-objects/ModelConfig'
+import type { ModelConfig, ModelProvider, ProvidersMap } from '../../domain/assistant/value-objects/ModelConfig'
+
+const VALID_PROVIDERS = new Set<ModelProvider>(['openai-compatible', 'openai-responses', 'anthropic', 'google'])
 
 interface RawConfigFile {
   model?: {
@@ -14,6 +16,7 @@ interface RawConfigFile {
     timeoutMs?: number
   }
   providers?: Record<string, {
+    provider?: string
     apiKey?: string
     baseUrl?: string
     models?: string[]
@@ -31,6 +34,11 @@ const DEFAULT_MODEL_CONFIG: ModelConfig = {
   maxTokens: 4096,
   temperature: 0.7,
   timeoutMs: 60_000,
+}
+
+function parseProvider(value: string | undefined): ModelProvider {
+  if (value && VALID_PROVIDERS.has(value as ModelProvider)) return value as ModelProvider
+  return 'openai-compatible'
 }
 
 async function readConfigFile(): Promise<RawConfigFile> {
@@ -51,7 +59,7 @@ export async function loadModelConfig(): Promise<ModelConfig> {
   const model = fileConfig.model ?? {}
 
   return {
-    provider: 'openai-compatible',
+    provider: parseProvider(process.env['ADNIFY_PROVIDER'] ?? model.provider),
     apiKey: process.env['ADNIFY_API_KEY'] ?? model.apiKey ?? DEFAULT_MODEL_CONFIG.apiKey,
     baseUrl: process.env['ADNIFY_BASE_URL'] ?? model.baseUrl ?? DEFAULT_MODEL_CONFIG.baseUrl,
     model: process.env['ADNIFY_MODEL'] ?? model.model ?? DEFAULT_MODEL_CONFIG.model,
@@ -72,6 +80,7 @@ export async function loadProviders(): Promise<ProvidersMap> {
   for (const [name, entry] of Object.entries(raw)) {
     if (entry.apiKey && entry.baseUrl) {
       result[name] = {
+        provider: parseProvider(entry.provider),
         apiKey: entry.apiKey,
         baseUrl: entry.baseUrl,
         models: entry.models ?? [],

@@ -1,5 +1,7 @@
+export type ModelProvider = 'openai-compatible' | 'openai-responses' | 'anthropic' | 'google'
+
 export interface ModelConfig {
-  provider: 'openai-compatible'
+  provider: ModelProvider
   apiKey: string
   baseUrl: string
   model: string
@@ -9,6 +11,7 @@ export interface ModelConfig {
 }
 
 export interface ProviderConfig {
+  provider: ModelProvider
   apiKey: string
   baseUrl: string
   models: string[]

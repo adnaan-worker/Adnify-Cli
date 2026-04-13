@@ -16,10 +16,15 @@ import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConf
  */
 export class ModelAssistantResponder implements AssistantResponderPort {
   constructor(
-    private readonly gateway: ModelGatewayPort,
-    private readonly config: ModelConfig,
+    private gateway: ModelGatewayPort,
+    private config: ModelConfig,
     private readonly logger: LoggerPort,
   ) {}
+
+  updateGateway(gateway: ModelGatewayPort, config: ModelConfig): void {
+    this.gateway = gateway
+    this.config = config
+  }
 
   async generateReply(command: AssistantResponderCommand): Promise<AssistantReply> {
     const chunks: string[] = []
@@ -34,6 +39,7 @@ export class ModelAssistantResponder implements AssistantResponderPort {
 
     this.logger.debug('Sending request to model gateway', {
       model: this.config.model,
+      provider: this.config.provider,
       messageCount: messages.length,
       mode: command.session.mode,
     })
