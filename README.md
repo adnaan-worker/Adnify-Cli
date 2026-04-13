@@ -162,27 +162,26 @@ Adnify-Cli/
 
 ## 6. 当前已搭建的内容
 
-初版脚手架会先交付下面这些能力：
-
 1. Bun + TypeScript + Ink 基础工程配置。
-2. DDD 目录骨架。
+2. DDD 目录骨架与端口/适配器模式。
 3. 会话聚合根与消息实体。
 4. 应用层用例：
    `BootstrapCliUseCase`
    `CreateSessionUseCase`
-   `SubmitPromptUseCase`
+   `SubmitPromptUseCase`（同步 + 流式）
    `ApplyCliCommandUseCase`
 5. 基础设施适配器：
    内存仓储、控制台日志、系统时钟、UUID 生成器、本地工作区探测器、AI 响应桩。
-6. 可运行的 Ink 初版界面：
-   标题区、消息区、输入区、底部帮助区。
-7. 本地命令雏形：
-   `:help`
-   `:mode chat|agent|plan`
-   `:workspace`
-   `:tools`
-   `:clear`
-   `:exit`
+6. **真实 AI 接入（Vercel AI SDK）**：
+   支持 `openai-compatible`（OpenAI / DeepSeek / Ollama 等）、`openai-responses`（OpenAI Responses API）、`anthropic`、`google` 四种 provider。
+   流式输出、错误恢复、超时控制、中断时保存部分内容。
+7. **配置系统**：
+   `~/.adnify-cli/config.json` + 环境变量（`ADNIFY_API_KEY`, `ADNIFY_BASE_URL`, `ADNIFY_MODEL`, `ADNIFY_PROVIDER`）。
+   多 provider 配置，运行时通过 `:model` 命令热切换。
+8. 可运行的 Ink 界面：
+   标题区、流式消息区、输入区、底部状态栏。
+9. 本地命令：
+   `:help` `:mode chat|agent|plan` `:workspace` `:tools` `:model [provider] [model]` `:config` `:clear` `:exit`
 
 ## 7. 运行方式
 
@@ -214,12 +213,12 @@ bun test
 - 完成 CLI 初版
 - 完成基础 README
 
-### Phase 2：真实 AI 接入
+### Phase 2：真实 AI 接入 ✅
 
-- 抽象 `ModelGateway`
-- 接入 OpenAI / Anthropic / OpenAI-Compatible
-- 增加流式输出
-- 增加错误恢复与超时控制
+- ~~抽象 `ModelGateway`~~ → `ModelGatewayPort` + `AiSdkGateway`
+- ~~接入 OpenAI / Anthropic / OpenAI-Compatible~~ → Vercel AI SDK 四种 provider
+- ~~增加流式输出~~ → `streamReply` + `executeStreaming`
+- ~~增加错误恢复与超时控制~~ → AbortController 超时 + 部分内容保存
 
 ### Phase 3：工具系统
 
@@ -255,23 +254,23 @@ bun test
 
 ## 10. 下一步建议
 
-这个初版脚手架完成后，下一步最值得继续做的是：
+Phase 1 和 Phase 2 已完成，下一步最值得继续做的是：
 
-1. 接入真实模型网关，把当前 AI 桩替换成流式推理适配器。
-2. 建立工具注册中心，把文件、命令、搜索能力纳入统一协议。
-3. 增加本地配置系统，支持模型、工作模式、权限和主题。
-4. 接入会话持久化与工作区记忆。
+1. 建立工具注册中心，把文件读写、命令执行、搜索能力纳入统一协议（Phase 3）。
+2. 接入 function calling，让模型能调用工具。
+3. 接入会话持久化与工作区记忆（Phase 4）。
+4. 引入权限审批层，控制危险操作。
 
 ## 11. 开发规范
 
 为了让 `vibecoding` 保持高效率但不失控，仓库增加了 `.rules` 规范目录：
 
-- [Rules Index](E:\26Project\Adnify-Cli\.rules\README.md)
-- [Core Rules](E:\26Project\Adnify-Cli\.rules\00-core.md)
-- [Architecture Rules](E:\26Project\Adnify-Cli\.rules\10-architecture.md)
-- [Coding Style Rules](E:\26Project\Adnify-Cli\.rules\20-coding-style.md)
-- [Delivery Workflow Rules](E:\26Project\Adnify-Cli\.rules\30-delivery-workflow.md)
-- [AI Collaboration Rules](E:\26Project\Adnify-Cli\.rules\40-ai-collaboration.md)
+- [Rules Index](.rules/README.md)
+- [Core Rules](.rules/00-core.md)
+- [Architecture Rules](.rules/10-architecture.md)
+- [Coding Style Rules](.rules/20-coding-style.md)
+- [Delivery Workflow Rules](.rules/30-delivery-workflow.md)
+- [AI Collaboration Rules](.rules/40-ai-collaboration.md)
 
 后续所有新增功能、重构、AI 生成代码和工具接入，都应以 `.rules` 中的约束为准。
 

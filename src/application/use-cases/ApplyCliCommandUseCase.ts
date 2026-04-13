@@ -187,7 +187,7 @@ export class ApplyCliCommandUseCase {
           '',
           '配置方式：',
           '1. 创建 ~/.adnify-cli/config.json',
-          '2. 或设置环境变量：ADNIFY_API_KEY, ADNIFY_BASE_URL, ADNIFY_MODEL',
+          '2. 或设置环境变量：ADNIFY_API_KEY, ADNIFY_BASE_URL, ADNIFY_MODEL, ADNIFY_PROVIDER',
         ].join('\n')
 
         session.addSystemMessage(this.idGenerator.next(), now, configText)

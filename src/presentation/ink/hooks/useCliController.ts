@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Key } from 'ink'
 import type { BootstrapSnapshot } from '../../../application/dto/BootstrapSnapshot'
 import type { ConversationSession } from '../../../domain/session/aggregates/ConversationSession'
-import type { AdnifyCliRuntime } from '../../../infrastructure/bootstrap/createRuntime'
+import type { AdnifyCliRuntime } from '../../../application/dto/AdnifyCliRuntime'
 
 export interface UseCliControllerParams {
   runtime: AdnifyCliRuntime

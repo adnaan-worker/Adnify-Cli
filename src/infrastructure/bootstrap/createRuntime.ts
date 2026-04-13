@@ -1,9 +1,9 @@
+import type { AdnifyCliRuntime } from '../../application/dto/AdnifyCliRuntime'
 import type { LoggerPort } from '../../application/ports/LoggerPort'
 import { ApplyCliCommandUseCase } from '../../application/use-cases/ApplyCliCommandUseCase'
 import { BootstrapCliUseCase } from '../../application/use-cases/BootstrapCliUseCase'
 import { CreateSessionUseCase } from '../../application/use-cases/CreateSessionUseCase'
 import { SubmitPromptUseCase } from '../../application/use-cases/SubmitPromptUseCase'
-import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import { DefaultCliConfigAdapter } from '../config/DefaultCliConfigAdapter'
 import { AiSdkGateway } from '../llm/AiSdkGateway'
 import { ModelAssistantResponder } from '../llm/ModelAssistantResponder'
@@ -12,17 +12,10 @@ import { ConsoleLogger } from '../logging/ConsoleLogger'
 import { InMemorySessionRepository } from '../persistence/InMemorySessionRepository'
 import { CryptoIdGenerator } from '../system/CryptoIdGenerator'
 import { SystemClock } from '../system/SystemClock'
+import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import { LocalWorkspaceContextService } from '../workspace/LocalWorkspaceContextService'
 
-export interface AdnifyCliRuntime {
-  useCases: {
-    bootstrapCli: BootstrapCliUseCase
-    createSession: CreateSessionUseCase
-    submitPrompt: SubmitPromptUseCase
-    applyCliCommand: ApplyCliCommandUseCase
-  }
-  switchModel: (providerName: string, modelName?: string) => ModelConfig | null
-}
+export type { AdnifyCliRuntime }
 
 /**
  * 统一装配运行时依赖。

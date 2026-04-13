@@ -69,6 +69,8 @@ function createMockConfig(): CliConfigPort {
         temperature: 0,
         timeoutMs: 5000,
       }) satisfies ModelConfig,
+    getProviders: () => ({}),
+    switchModel: () => null,
     getToolCatalog: () => [],
     getLocalCommands: () => [],
   }

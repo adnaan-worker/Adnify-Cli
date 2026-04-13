@@ -1,5 +1,5 @@
 import { Box, Newline, Text, useApp, useInput } from 'ink'
-import type { AdnifyCliRuntime } from '../../infrastructure/bootstrap/createRuntime'
+import type { AdnifyCliRuntime } from '../../application/dto/AdnifyCliRuntime'
 import { ConversationPane } from './components/ConversationPane'
 import { FooterHelp } from './components/FooterHelp'
 import { Header } from './components/Header'
