@@ -53,6 +53,8 @@ export function createDefaultLocalCommands(): string[] {
     ':mode plan',
     ':workspace',
     ':tools',
+    ':model [provider] [model]',
+    ':config',
     ':clear',
     ':exit',
   ]

@@ -2,6 +2,7 @@ import type {
   AssistantReply,
   AssistantResponderCommand,
   AssistantResponderPort,
+  AssistantStreamChunk,
 } from '../../application/ports/AssistantResponderPort'
 import type { LoggerPort } from '../../application/ports/LoggerPort'
 
@@ -13,6 +14,28 @@ export class StubAssistantResponder implements AssistantResponderPort {
   constructor(private readonly logger: LoggerPort) {}
 
   async generateReply(command: AssistantResponderCommand): Promise<AssistantReply> {
+    const content = this.buildReplyContent(command)
+    return { content }
+  }
+
+  async *streamReply(command: AssistantResponderCommand): AsyncIterable<AssistantStreamChunk> {
+    this.logger.debug('Streaming stub assistant reply', {
+      mode: command.session.mode,
+      workspace: command.workspace.rootPath,
+    })
+
+    const content = this.buildReplyContent(command)
+    const words = content.split(/(?<=\s)/)
+
+    for (const word of words) {
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      yield { delta: word, done: false }
+    }
+
+    yield { delta: '', done: true }
+  }
+
+  private buildReplyContent(command: AssistantResponderCommand): string {
     this.logger.debug('Generating stub assistant reply', {
       mode: command.session.mode,
       workspace: command.workspace.rootPath,
@@ -30,24 +53,21 @@ export class StubAssistantResponder implements AssistantResponderPort {
     }
 
     if (prompt.includes('工具') || prompt.includes('tool')) {
-      suggestions.push('工具系统建议采用“目录 + 权限 + 执行器 + 结果模型”四段式设计。')
+      suggestions.push('工具系统建议采用"目录 + 权限 + 执行器 + 结果模型"四段式设计。')
     }
 
     if (suggestions.length === 0) {
       suggestions.push('当前是初版脚手架阶段，建议优先补齐模型网关、工具注册中心和配置系统。')
     }
 
-    return {
-      content: [
-        `已收到你的输入：${command.prompt}`,
-        `当前模式：${command.session.mode}`,
-        `工作区包管理器：${command.workspace.packageManager}`,
-        `已规划工具数：${command.toolCatalog.length}`,
-        '',
-        '初步建议：',
-        ...suggestions.map((item) => `- ${item}`),
-      ].join('\n'),
-    }
+    return [
+      `已收到你的输入：${command.prompt}`,
+      `当前模式：${command.session.mode}`,
+      `工作区包管理器：${command.workspace.packageManager}`,
+      `已规划工具数：${command.toolCatalog.length}`,
+      '',
+      '初步建议：',
+      ...suggestions.map((item) => `- ${item}`),
+    ].join('\n')
   }
 }
-

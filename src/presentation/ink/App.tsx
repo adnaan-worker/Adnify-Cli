@@ -1,5 +1,5 @@
 import { Box, Newline, Text, useApp, useInput } from 'ink'
-import type { AdnifyCliRuntime } from '../../infrastructure/bootstrap/createRuntime'
+import type { AdnifyCliRuntime } from '../../application/dto/AdnifyCliRuntime'
 import { ConversationPane } from './components/ConversationPane'
 import { FooterHelp } from './components/FooterHelp'
 import { Header } from './components/Header'
@@ -47,10 +47,12 @@ export function App(props: AppProps) {
         workspace={controller.bootstrap.workspace}
         currentMode={controller.session.mode}
       />
-      <ConversationPane messages={controller.session.getRecentMessages(14)} />
+      <ConversationPane
+        messages={controller.session.getRecentMessages(14)}
+        streamingText={controller.streamingText}
+      />
       <PromptComposer value={controller.inputValue} busy={controller.isBusy} />
       <FooterHelp statusLine={controller.statusLine} />
     </Box>
   )
 }
-

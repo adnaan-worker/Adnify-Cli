@@ -6,10 +6,15 @@ import type { IdGeneratorPort } from '../ports/IdGeneratorPort'
 import type { LoggerPort } from '../ports/LoggerPort'
 import type { SessionRepositoryPort } from '../ports/SessionRepositoryPort'
 
+export interface ModelSwitcher {
+  switchModel: (providerName: string, modelName?: string) => { model: string; baseUrl: string } | null
+}
+
 export interface ApplyCliCommandCommand {
   sessionId: string
   commandLine: string
   bootstrap: BootstrapSnapshot
+  modelSwitcher?: ModelSwitcher
 }
 
 export interface ApplyCliCommandResult {
@@ -108,6 +113,88 @@ export class ApplyCliCommandUseCase {
         return {
           session,
           statusLine: '已输出工具目录。',
+        }
+      }
+      case 'model': {
+        const mc = command.bootstrap.modelConfig
+        const providers = command.bootstrap.providers
+
+        if (!args[0]) {
+          const providerList = Object.entries(providers).map(([name, p]) =>
+            `- ${name}: ${p.models.join(', ')} (${p.baseUrl})`,
+          )
+          session.addSystemMessage(
+            this.idGenerator.next(),
+            now,
+            [
+              `当前模型：${mc.model} (${mc.baseUrl})`,
+              '',
+              providerList.length > 0
+                ? ['可用 Provider：', ...providerList].join('\n')
+                : '未配置其他 Provider。在 ~/.adnify-cli/config.json 的 providers 中添加。',
+              '',
+              '用法：:model <provider> [model]',
+              '示例：:model jucodex gpt-5.1-codex',
+            ].join('\n'),
+          )
+          await this.sessionRepository.save(session)
+          return { session, statusLine: `当前模型：${mc.model}` }
+        }
+
+        const providerName = args[0]
+        const modelName = args[1]
+
+        if (!command.modelSwitcher) {
+          session.addSystemMessage(this.idGenerator.next(), now, '模型切换功能未就绪。')
+          await this.sessionRepository.save(session)
+          return { session, statusLine: '模型切换失败。' }
+        }
+
+        const result = command.modelSwitcher.switchModel(providerName, modelName)
+        if (!result) {
+          const available = Object.keys(providers).join(', ') || '无'
+          session.addSystemMessage(
+            this.idGenerator.next(),
+            now,
+            `Provider "${providerName}" 不存在或未配置模型。\n可用 Provider：${available}`,
+          )
+          await this.sessionRepository.save(session)
+          return { session, statusLine: `切换失败：未找到 ${providerName}` }
+        }
+
+        session.addSystemMessage(
+          this.idGenerator.next(),
+          now,
+          `已切换到 ${result.model} (${result.baseUrl})`,
+        )
+        await this.sessionRepository.save(session)
+        return { session, statusLine: `当前模型：${result.model}` }
+      }
+      case 'config': {
+        const mc = command.bootstrap.modelConfig
+        const masked = mc.apiKey
+          ? mc.apiKey.slice(0, 6) + '...' + mc.apiKey.slice(-4)
+          : '未配置'
+        const configText = [
+          '当前模型配置：',
+          `- Provider：${mc.provider}`,
+          `- API Key：${masked}`,
+          `- Base URL：${mc.baseUrl}`,
+          `- Model：${mc.model}`,
+          `- Max Tokens：${mc.maxTokens}`,
+          `- Temperature：${mc.temperature}`,
+          `- Timeout：${mc.timeoutMs}ms`,
+          '',
+          '配置方式：',
+          '1. 创建 ~/.adnify-cli/config.json',
+          '2. 或设置环境变量：ADNIFY_API_KEY, ADNIFY_BASE_URL, ADNIFY_MODEL, ADNIFY_PROVIDER',
+        ].join('\n')
+
+        session.addSystemMessage(this.idGenerator.next(), now, configText)
+        await this.sessionRepository.save(session)
+        return {
+          session,
+          statusLine: '已输出模型配置。',
         }
       }
       case 'clear': {
