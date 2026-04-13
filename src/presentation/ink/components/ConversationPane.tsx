@@ -4,6 +4,7 @@ import type { ConversationMessage } from '../../../domain/session/entities/Conve
 export interface ConversationPaneProps {
   messages: ConversationMessage[]
   streamingText?: string
+  configInitPrompt?: string
 }
 
 function getRoleColor(role: ConversationMessage['role']): string {
@@ -52,6 +53,12 @@ export function ConversationPane(props: ConversationPaneProps) {
             <Box flexDirection="column" marginTop={1}>
               <Text color="green">[ASSISTANT] ...</Text>
               <Text>{props.streamingText}</Text>
+            </Box>
+          ) : null}
+          {props.configInitPrompt ? (
+            <Box flexDirection="column" marginTop={1}>
+              <Text color="magenta" bold>{'── 模型配置引导 ──'}</Text>
+              <Text color="yellow">{props.configInitPrompt}</Text>
             </Box>
           ) : null}
         </>

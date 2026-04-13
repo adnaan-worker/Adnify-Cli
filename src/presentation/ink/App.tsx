@@ -50,6 +50,7 @@ export function App(props: AppProps) {
       <ConversationPane
         messages={controller.session.getRecentMessages(14)}
         streamingText={controller.streamingText}
+        configInitPrompt={controller.configInitPrompt}
       />
       <PromptComposer value={controller.inputValue} busy={controller.isBusy} />
       <FooterHelp statusLine={controller.statusLine} />

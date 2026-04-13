@@ -55,6 +55,7 @@ export function createDefaultLocalCommands(): string[] {
     ':tools',
     ':model [provider] [model]',
     ':config',
+    ':config init',
     ':clear',
     ':exit',
   ]

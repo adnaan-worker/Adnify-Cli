@@ -3,6 +3,7 @@ import type { Key } from 'ink'
 import type { BootstrapSnapshot } from '../../../application/dto/BootstrapSnapshot'
 import type { ConversationSession } from '../../../domain/session/aggregates/ConversationSession'
 import type { AdnifyCliRuntime } from '../../../application/dto/AdnifyCliRuntime'
+import { useConfigInit } from './useConfigInit'
 
 export interface UseCliControllerParams {
   runtime: AdnifyCliRuntime
@@ -18,6 +19,7 @@ export interface CliControllerState {
   streamingText: string
   isBooting: boolean
   isBusy: boolean
+  configInitPrompt: string
   handleInput: (input: string, key: Key) => void
 }
 
@@ -34,6 +36,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
   const [isBooting, setIsBooting] = useState(true)
   const [isBusy, setIsBusy] = useState(false)
   const busyRef = useRef(false)
+  const configInit = useConfigInit()
 
   useEffect(() => {
     let mounted = true
@@ -54,7 +57,13 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
 
         setBootstrap(bootSnapshot)
         setSession(createdSession)
-        setStatusLine('启动完成，可以开始交互。')
+
+        if (!bootSnapshot.modelConfig?.apiKey) {
+          configInit.start()
+          setStatusLine('未检测到模型配置，请完成初始化。')
+        } else {
+          setStatusLine('启动完成，可以开始交互。')
+        }
       } catch (error) {
         if (!mounted) return
         const message = error instanceof Error ? error.message : '未知错误'
@@ -79,6 +88,21 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     setInputValue('')
 
     try {
+      if (configInit.isActive) {
+        const result = await configInit.handleInput(nextInput)
+        if (result) {
+          setBootstrap((prev) => prev ? { ...prev, modelConfig: result.config } : prev)
+          setStatusLine(result.message)
+        }
+        return
+      }
+
+      if (nextInput === ':config init') {
+        configInit.start()
+        setStatusLine('开始配置引导...')
+        return
+      }
+
       if (nextInput.startsWith(':')) {
         const result = await params.runtime.useCases.applyCliCommand.execute({
           sessionId: session.id,
@@ -133,7 +157,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       busyRef.current = false
       setIsBusy(false)
     }
-  }, [session, bootstrap, inputValue, params])
+  }, [session, bootstrap, inputValue, params, configInit])
 
   const handleInput = useCallback((input: string, key: Key) => {
     if (key.ctrl && input === 'c') {
@@ -169,6 +193,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     streamingText,
     isBooting,
     isBusy,
+    configInitPrompt: configInit.isActive ? configInit.promptText : '',
     handleInput,
   }
 }
