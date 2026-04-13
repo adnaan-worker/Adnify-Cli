@@ -37,7 +37,12 @@ export function ConversationPane(props: ConversationPaneProps) {
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1} marginBottom={1}>
       <Text bold>Conversation</Text>
-      {props.messages.length === 0 && !props.streamingText ? (
+      {props.configInitPrompt ? (
+        <Box flexDirection="column" marginTop={1}>
+          <Text color="magenta" bold>{'── 模型配置引导 ──'}</Text>
+          <Text color="yellow">{props.configInitPrompt}</Text>
+        </Box>
+      ) : props.messages.length === 0 && !props.streamingText ? (
         <Text dimColor>还没有消息，试试输入一个问题或者执行 :help。</Text>
       ) : (
         <>
@@ -53,12 +58,6 @@ export function ConversationPane(props: ConversationPaneProps) {
             <Box flexDirection="column" marginTop={1}>
               <Text color="green">[ASSISTANT] ...</Text>
               <Text>{props.streamingText}</Text>
-            </Box>
-          ) : null}
-          {props.configInitPrompt ? (
-            <Box flexDirection="column" marginTop={1}>
-              <Text color="magenta" bold>{'── 模型配置引导 ──'}</Text>
-              <Text color="yellow">{props.configInitPrompt}</Text>
             </Box>
           ) : null}
         </>

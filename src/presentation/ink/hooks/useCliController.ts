@@ -81,6 +81,27 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     if (!session || !bootstrap || busyRef.current) return
 
     const nextInput = inputValue.trim()
+
+    if (configInit.isActive) {
+      busyRef.current = true
+      setIsBusy(true)
+      setInputValue('')
+      try {
+        const result = await configInit.handleInput(nextInput)
+        if (result) {
+          setBootstrap((prev) => prev ? { ...prev, modelConfig: result.config } : prev)
+          setStatusLine(result.message)
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '未知错误'
+        setStatusLine(`配置失败：${message}`)
+      } finally {
+        busyRef.current = false
+        setIsBusy(false)
+      }
+      return
+    }
+
     if (!nextInput) return
 
     busyRef.current = true
@@ -88,15 +109,6 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     setInputValue('')
 
     try {
-      if (configInit.isActive) {
-        const result = await configInit.handleInput(nextInput)
-        if (result) {
-          setBootstrap((prev) => prev ? { ...prev, modelConfig: result.config } : prev)
-          setStatusLine(result.message)
-        }
-        return
-      }
-
       if (nextInput === ':config init') {
         configInit.start()
         setStatusLine('开始配置引导...')
@@ -193,7 +205,9 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     streamingText,
     isBooting,
     isBusy,
-    configInitPrompt: configInit.isActive ? configInit.promptText : '',
+    configInitPrompt: configInit.isActive
+      ? configInit.promptText + (configInit.errorText ? `\n⚠ ${configInit.errorText}` : '')
+      : '',
     handleInput,
   }
 }

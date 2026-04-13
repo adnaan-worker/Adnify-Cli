@@ -8,6 +8,7 @@ type InitStep = 'idle' | 'select-provider' | 'select-model' | 'enter-apikey' | '
 export interface ConfigInitState {
   isActive: boolean
   promptText: string
+  errorText: string
   start: () => void
   handleInput: (input: string) => Promise<ConfigInitResult | null>
 }
@@ -23,6 +24,7 @@ export interface ConfigInitResult {
  */
 export function useConfigInit(): ConfigInitState {
   const [step, setStep] = useState<InitStep>('idle')
+  const [errorText, setErrorText] = useState('')
   const chosen = useRef<{
     preset: ProviderPreset | null
     model: string
@@ -80,27 +82,32 @@ export function useConfigInit(): ConfigInitState {
 
   const start = useCallback(() => {
     chosen.current = { preset: null, model: '', apiKey: '', baseUrl: '', isCustom: false }
+    setErrorText('')
     setStep('select-provider')
   }, [])
 
   const handleInput = useCallback(async (input: string): Promise<ConfigInitResult | null> => {
     const trimmed = input.trim()
+    setErrorText('')
 
     switch (step) {
       case 'select-provider': {
         const idx = parseInt(trimmed, 10) - 1
-        const customIdx = PROVIDER_PRESETS.length
+        const maxIdx = PROVIDER_PRESETS.length
 
-        if (idx === customIdx) {
+        if (Number.isNaN(idx) || idx < 0 || idx > maxIdx) {
+          setErrorText(`请输入 1-${maxIdx + 1} 之间的序号`)
+          return null
+        }
+
+        if (idx === maxIdx) {
           chosen.current.isCustom = true
           chosen.current.preset = null
           setStep('enter-baseurl')
           return null
         }
 
-        const preset = PROVIDER_PRESETS[idx]
-        if (!preset) return null
-
+        const preset = PROVIDER_PRESETS[idx]!
         chosen.current.preset = preset
         chosen.current.baseUrl = preset.baseUrl
         chosen.current.isCustom = false
@@ -119,7 +126,11 @@ export function useConfigInit(): ConfigInitState {
           chosen.current.model = preset.defaultModel
         } else {
           const idx = parseInt(trimmed, 10) - 1
-          chosen.current.model = preset.models[idx] ?? preset.defaultModel
+          if (Number.isNaN(idx) || idx < 0 || idx >= preset.models.length) {
+            setErrorText(`请输入 1-${preset.models.length} 之间的序号，或直接回车`)
+            return null
+          }
+          chosen.current.model = preset.models[idx]!
         }
 
         setStep('enter-apikey')
@@ -127,7 +138,10 @@ export function useConfigInit(): ConfigInitState {
       }
 
       case 'enter-baseurl': {
-        if (!trimmed) return null
+        if (!trimmed) {
+          setErrorText('Base URL 不能为空')
+          return null
+        }
         chosen.current.baseUrl = trimmed
         chosen.current.model = ''
         setStep('enter-apikey')
@@ -135,7 +149,10 @@ export function useConfigInit(): ConfigInitState {
       }
 
       case 'enter-apikey': {
-        if (!trimmed) return null
+        if (!trimmed) {
+          setErrorText('API Key 不能为空')
+          return null
+        }
         chosen.current.apiKey = trimmed
 
         if (chosen.current.isCustom && !chosen.current.model) {
@@ -147,11 +164,15 @@ export function useConfigInit(): ConfigInitState {
       }
 
       case 'confirm': {
-        if (trimmed.toLowerCase() === 'n') {
+        const lower = trimmed.toLowerCase()
+        if (lower === 'n') {
           setStep('idle')
           return null
         }
-        if (trimmed.toLowerCase() !== 'y') return null
+        if (lower !== 'y') {
+          setErrorText('请输入 y 或 n')
+          return null
+        }
 
         const c = chosen.current
         const config: ModelConfig = {
@@ -181,6 +202,7 @@ export function useConfigInit(): ConfigInitState {
   return {
     isActive: step !== 'idle' && step !== 'done',
     promptText: buildPromptText(),
+    errorText,
     start,
     handleInput,
   }
