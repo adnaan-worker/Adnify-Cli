@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
+import type { ModelConfig, ProvidersMap } from '../../domain/assistant/value-objects/ModelConfig'
 
 interface RawConfigFile {
   model?: {
@@ -13,6 +13,11 @@ interface RawConfigFile {
     temperature?: number
     timeoutMs?: number
   }
+  providers?: Record<string, {
+    apiKey?: string
+    baseUrl?: string
+    models?: string[]
+  }>
 }
 
 const CONFIG_DIR = join(homedir(), '.adnify-cli')
@@ -28,20 +33,21 @@ const DEFAULT_MODEL_CONFIG: ModelConfig = {
   timeoutMs: 60_000,
 }
 
+async function readConfigFile(): Promise<RawConfigFile> {
+  try {
+    const raw = await readFile(CONFIG_PATH, 'utf-8')
+    return JSON.parse(raw) as RawConfigFile
+  } catch {
+    return {}
+  }
+}
+
 /**
  * 从 ~/.adnify-cli/config.json 和环境变量加载模型配置。
  * 优先级：环境变量 > 配置文件 > 内置默认值。
  */
 export async function loadModelConfig(): Promise<ModelConfig> {
-  let fileConfig: RawConfigFile = {}
-
-  try {
-    const raw = await readFile(CONFIG_PATH, 'utf-8')
-    fileConfig = JSON.parse(raw) as RawConfigFile
-  } catch {
-    // config file not found or invalid — fall through to defaults
-  }
-
+  const fileConfig = await readConfigFile()
   const model = fileConfig.model ?? {}
 
   return {
@@ -53,4 +59,25 @@ export async function loadModelConfig(): Promise<ModelConfig> {
     temperature: model.temperature ?? DEFAULT_MODEL_CONFIG.temperature,
     timeoutMs: model.timeoutMs ?? DEFAULT_MODEL_CONFIG.timeoutMs,
   }
+}
+
+/**
+ * 加载 providers 配置，用于运行时切换模型。
+ */
+export async function loadProviders(): Promise<ProvidersMap> {
+  const fileConfig = await readConfigFile()
+  const raw = fileConfig.providers ?? {}
+  const result: ProvidersMap = {}
+
+  for (const [name, entry] of Object.entries(raw)) {
+    if (entry.apiKey && entry.baseUrl) {
+      result[name] = {
+        apiKey: entry.apiKey,
+        baseUrl: entry.baseUrl,
+        models: entry.models ?? [],
+      }
+    }
+  }
+
+  return result
 }

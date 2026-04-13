@@ -22,6 +22,7 @@ export interface AdnifyCliRuntime {
     submitPrompt: SubmitPromptUseCase
     applyCliCommand: ApplyCliCommandUseCase
   }
+  switchModel: (providerName: string, modelName?: string) => ModelConfig | null
 }
 
 function createResponder(modelConfig: ModelConfig, logger: LoggerPort): AssistantResponderPort {
@@ -37,7 +38,7 @@ function createResponder(modelConfig: ModelConfig, logger: LoggerPort): Assistan
 
 /**
  * 统一装配运行时依赖。
- * 根据配置自动选择桩或真实模型适配器。
+ * 根据配置自动选择桩或真实模型适配器，支持运行时切换模型。
  */
 export async function createRuntime(): Promise<AdnifyCliRuntime> {
   const logger = new ConsoleLogger()
@@ -47,25 +48,38 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
   const clock = new SystemClock()
   const workspaceContextService = new LocalWorkspaceContextService()
 
-  const { loadModelConfig } = await import('../config/loadLocalConfig')
+  const { loadModelConfig, loadProviders } = await import('../config/loadLocalConfig')
   const modelConfig = await loadModelConfig()
+  const providers = await loadProviders()
   config.setModelConfig(modelConfig)
+  config.setProviders(providers)
 
-  const assistantResponder = createResponder(modelConfig, logger)
+  let assistantResponder = createResponder(modelConfig, logger)
+
+  const submitPrompt = new SubmitPromptUseCase(
+    sessionRepository,
+    workspaceContextService,
+    assistantResponder,
+    config,
+    idGenerator,
+    clock,
+    logger,
+  )
+
+  const switchModel = (providerName: string, modelName?: string): ModelConfig | null => {
+    const newConfig = config.switchModel(providerName, modelName)
+    if (!newConfig) return null
+
+    assistantResponder = createResponder(newConfig, logger)
+    submitPrompt.updateResponder(assistantResponder)
+    return newConfig
+  }
 
   return {
     useCases: {
       bootstrapCli: new BootstrapCliUseCase(workspaceContextService, config, logger),
       createSession: new CreateSessionUseCase(sessionRepository, idGenerator, clock, logger),
-      submitPrompt: new SubmitPromptUseCase(
-        sessionRepository,
-        workspaceContextService,
-        assistantResponder,
-        config,
-        idGenerator,
-        clock,
-        logger,
-      ),
+      submitPrompt,
       applyCliCommand: new ApplyCliCommandUseCase(
         sessionRepository,
         idGenerator,
@@ -73,5 +87,6 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
         logger,
       ),
     },
+    switchModel,
   }
 }

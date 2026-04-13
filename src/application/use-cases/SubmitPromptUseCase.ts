@@ -31,12 +31,16 @@ export class SubmitPromptUseCase {
   constructor(
     private readonly sessionRepository: SessionRepositoryPort,
     private readonly workspaceContextPort: WorkspaceContextPort,
-    private readonly assistantResponder: AssistantResponderPort,
+    private assistantResponder: AssistantResponderPort,
     private readonly config: CliConfigPort,
     private readonly idGenerator: IdGeneratorPort,
     private readonly clock: ClockPort,
     private readonly logger: LoggerPort,
   ) {}
+
+  updateResponder(responder: AssistantResponderPort): void {
+    this.assistantResponder = responder
+  }
 
   async execute(command: SubmitPromptCommand): Promise<SubmitPromptResult> {
     const session = await this.sessionRepository.findById(command.sessionId)

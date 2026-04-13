@@ -84,6 +84,15 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
           sessionId: session.id,
           commandLine: nextInput,
           bootstrap,
+          modelSwitcher: {
+            switchModel: (providerName, modelName) => {
+              const newConfig = params.runtime.switchModel(providerName, modelName)
+              if (newConfig) {
+                setBootstrap((prev) => prev ? { ...prev, modelConfig: newConfig } : prev)
+              }
+              return newConfig ? { model: newConfig.model, baseUrl: newConfig.baseUrl } : null
+            },
+          },
         })
 
         setSession(result.session)

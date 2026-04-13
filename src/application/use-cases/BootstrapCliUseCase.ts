@@ -27,11 +27,13 @@ export class BootstrapCliUseCase {
     const localCommands = this.config.getLocalCommands()
 
     const modelConfig = this.config.getModelConfig()
+    const providers = this.config.getProviders()
 
     return {
       profile,
       workspace,
       modelConfig,
+      providers,
       toolCatalog,
       localCommands,
       supportedModes: [...ASSISTANT_MODES],
