@@ -110,6 +110,33 @@ export class ApplyCliCommandUseCase {
           statusLine: '已输出工具目录。',
         }
       }
+      case 'config': {
+        const mc = command.bootstrap.modelConfig
+        const masked = mc.apiKey
+          ? mc.apiKey.slice(0, 6) + '...' + mc.apiKey.slice(-4)
+          : '未配置'
+        const configText = [
+          '当前模型配置：',
+          `- Provider：${mc.provider}`,
+          `- API Key：${masked}`,
+          `- Base URL：${mc.baseUrl}`,
+          `- Model：${mc.model}`,
+          `- Max Tokens：${mc.maxTokens}`,
+          `- Temperature：${mc.temperature}`,
+          `- Timeout：${mc.timeoutMs}ms`,
+          '',
+          '配置方式：',
+          '1. 创建 ~/.adnify-cli/config.json',
+          '2. 或设置环境变量：ADNIFY_API_KEY, ADNIFY_BASE_URL, ADNIFY_MODEL',
+        ].join('\n')
+
+        session.addSystemMessage(this.idGenerator.next(), now, configText)
+        await this.sessionRepository.save(session)
+        return {
+          session,
+          statusLine: '已输出模型配置。',
+        }
+      }
       case 'clear': {
         session.clearConversation(now)
         session.addSystemMessage(

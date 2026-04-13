@@ -3,6 +3,7 @@ import type { ConversationMessage } from '../../../domain/session/entities/Conve
 
 export interface ConversationPaneProps {
   messages: ConversationMessage[]
+  streamingText?: string
 }
 
 function getRoleColor(role: ConversationMessage['role']): string {
@@ -35,19 +36,26 @@ export function ConversationPane(props: ConversationPaneProps) {
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1} marginBottom={1}>
       <Text bold>Conversation</Text>
-      {props.messages.length === 0 ? (
+      {props.messages.length === 0 && !props.streamingText ? (
         <Text dimColor>还没有消息，试试输入一个问题或者执行 :help。</Text>
       ) : (
-        props.messages.map((message) => (
-          <Box key={message.id} flexDirection="column" marginTop={1}>
-            <Text color={getRoleColor(message.role)}>
-              [{getRoleLabel(message.role)}] {message.createdAt.toLocaleTimeString()}
-            </Text>
-            <Text>{message.content}</Text>
-          </Box>
-        ))
+        <>
+          {props.messages.map((message) => (
+            <Box key={message.id} flexDirection="column" marginTop={1}>
+              <Text color={getRoleColor(message.role)}>
+                [{getRoleLabel(message.role)}] {message.createdAt.toLocaleTimeString()}
+              </Text>
+              <Text>{message.content}</Text>
+            </Box>
+          ))}
+          {props.streamingText ? (
+            <Box flexDirection="column" marginTop={1}>
+              <Text color="green">[ASSISTANT] ...</Text>
+              <Text>{props.streamingText}</Text>
+            </Box>
+          ) : null}
+        </>
       )}
     </Box>
   )
 }
-

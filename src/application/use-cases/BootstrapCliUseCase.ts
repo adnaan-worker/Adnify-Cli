@@ -26,9 +26,12 @@ export class BootstrapCliUseCase {
     const toolCatalog = this.config.getToolCatalog()
     const localCommands = this.config.getLocalCommands()
 
+    const modelConfig = this.config.getModelConfig()
+
     return {
       profile,
       workspace,
+      modelConfig,
       toolCatalog,
       localCommands,
       supportedModes: [...ASSISTANT_MODES],
@@ -36,6 +39,9 @@ export class BootstrapCliUseCase {
         `${profile.name} 已完成初步启动。`,
         `当前工作区：${workspace.rootPath}`,
         `默认模式：${profile.defaultMode}`,
+        modelConfig.apiKey
+          ? `模型：${modelConfig.model} (${modelConfig.baseUrl})`
+          : '未配置 API Key，使用桩响应器。输入 :config 查看配置说明。',
         '输入 :help 查看本地命令，直接输入自然语言则会进入助手对话。',
       ].join('\n'),
     }

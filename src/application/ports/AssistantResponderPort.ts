@@ -6,6 +6,11 @@ export interface AssistantReply {
   content: string
 }
 
+export interface AssistantStreamChunk {
+  delta: string
+  done: boolean
+}
+
 export interface AssistantResponderCommand {
   prompt: string
   session: ConversationSession
@@ -15,9 +20,10 @@ export interface AssistantResponderCommand {
 
 /**
  * 助手响应端口。
- * 后续可以替换为 OpenAI、Anthropic、本地模型或自建网关。
+ * 支持同步和流式两种模式，流式为 CLI 交互体验的主路径。
  */
 export interface AssistantResponderPort {
   generateReply(command: AssistantResponderCommand): Promise<AssistantReply>
+  streamReply(command: AssistantResponderCommand): AsyncIterable<AssistantStreamChunk>
 }
 

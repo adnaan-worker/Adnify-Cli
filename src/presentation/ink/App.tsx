@@ -47,10 +47,12 @@ export function App(props: AppProps) {
         workspace={controller.bootstrap.workspace}
         currentMode={controller.session.mode}
       />
-      <ConversationPane messages={controller.session.getRecentMessages(14)} />
+      <ConversationPane
+        messages={controller.session.getRecentMessages(14)}
+        streamingText={controller.streamingText}
+      />
       <PromptComposer value={controller.inputValue} busy={controller.isBusy} />
       <FooterHelp statusLine={controller.statusLine} />
     </Box>
   )
 }
-

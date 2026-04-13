@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Key } from 'ink'
 import type { BootstrapSnapshot } from '../../../application/dto/BootstrapSnapshot'
 import type { ConversationSession } from '../../../domain/session/aggregates/ConversationSession'
@@ -15,6 +15,7 @@ export interface CliControllerState {
   session: ConversationSession | null
   inputValue: string
   statusLine: string
+  streamingText: string
   isBooting: boolean
   isBusy: boolean
   handleInput: (input: string, key: Key) => void
@@ -22,15 +23,17 @@ export interface CliControllerState {
 
 /**
  * Ink 表现层状态桥。
- * 这里只负责“把用户输入翻译成用例调用”，不直接承载领域规则。
+ * 这里只负责"把用户输入翻译成用例调用"，不直接承载领域规则。
  */
 export function useCliController(params: UseCliControllerParams): CliControllerState {
   const [bootstrap, setBootstrap] = useState<BootstrapSnapshot | null>(null)
   const [session, setSession] = useState<ConversationSession | null>(null)
   const [inputValue, setInputValue] = useState('')
   const [statusLine, setStatusLine] = useState('正在初始化...')
+  const [streamingText, setStreamingText] = useState('')
   const [isBooting, setIsBooting] = useState(true)
   const [isBusy, setIsBusy] = useState(false)
+  const busyRef = useRef(false)
 
   useEffect(() => {
     let mounted = true
@@ -47,44 +50,31 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
           welcomeMessage: bootSnapshot.welcomeMessage,
         })
 
-        if (!mounted) {
-          return
-        }
+        if (!mounted) return
 
         setBootstrap(bootSnapshot)
         setSession(createdSession)
         setStatusLine('启动完成，可以开始交互。')
       } catch (error) {
-        if (!mounted) {
-          return
-        }
-
+        if (!mounted) return
         const message = error instanceof Error ? error.message : '未知错误'
         setStatusLine(`启动失败：${message}`)
       } finally {
-        if (mounted) {
-          setIsBooting(false)
-        }
+        if (mounted) setIsBooting(false)
       }
     }
 
     void run()
-
-    return () => {
-      mounted = false
-    }
+    return () => { mounted = false }
   }, [params.cwd, params.runtime.useCases.bootstrapCli, params.runtime.useCases.createSession])
 
-  const handleSubmit = async () => {
-    if (!session || !bootstrap || isBusy) {
-      return
-    }
+  const handleSubmit = useCallback(async () => {
+    if (!session || !bootstrap || busyRef.current) return
 
     const nextInput = inputValue.trim()
-    if (!nextInput) {
-      return
-    }
+    if (!nextInput) return
 
+    busyRef.current = true
     setIsBusy(true)
     setInputValue('')
 
@@ -102,26 +92,41 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
         if (result.shouldExit) {
           params.onExit()
         }
-
         return
       }
 
-      const result = await params.runtime.useCases.submitPrompt.execute({
-        sessionId: session.id,
-        prompt: nextInput,
-      })
+      setStreamingText('')
+      setStatusLine('正在生成响应...')
+
+      const result = await params.runtime.useCases.submitPrompt.executeStreaming(
+        { sessionId: session.id, prompt: nextInput },
+        {
+          onChunk: (delta) => {
+            setStreamingText((prev) => prev + delta)
+          },
+          onDone: () => {
+            setStreamingText('')
+          },
+          onError: (error) => {
+            setStreamingText('')
+            setStatusLine(`响应失败：${error.message}`)
+          },
+        },
+      )
 
       setSession(result.session)
       setStatusLine(result.statusLine)
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误'
       setStatusLine(`执行失败：${message}`)
+      setStreamingText('')
     } finally {
+      busyRef.current = false
       setIsBusy(false)
     }
-  }
+  }, [session, bootstrap, inputValue, params])
 
-  const handleInput = (input: string, key: Key) => {
+  const handleInput = useCallback((input: string, key: Key) => {
     if (key.ctrl && input === 'c') {
       params.onExit()
       return
@@ -145,16 +150,16 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     if (!key.ctrl && !key.meta) {
       setInputValue((previous) => previous + input)
     }
-  }
+  }, [handleSubmit, params])
 
   return {
     bootstrap,
     session,
     inputValue,
     statusLine,
+    streamingText,
     isBooting,
     isBusy,
     handleInput,
   }
 }
-
