@@ -6,3 +6,4 @@ dist
 .adnify-cli
 *.log
 cc
+.adnify
