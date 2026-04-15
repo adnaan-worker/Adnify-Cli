@@ -1,20 +1,18 @@
+import type { AssistantPromptSet } from '../../application/dto/AssistantPromptSet'
 import type { CliConfigPort } from '../../application/ports/CliConfigPort'
 import type { AssistantProfile } from '../../domain/assistant/entities/AssistantProfile'
 import type { ModelConfig, ProvidersMap } from '../../domain/assistant/value-objects/ModelConfig'
 import type { ToolDescriptor } from '../../domain/tooling/entities/ToolDescriptor'
-import {
-  createDefaultAssistantProfile,
-  createDefaultLocalCommands,
-  createDefaultToolCatalog,
-} from './defaultConfig'
+import type { PromptBundle } from '../prompt/PromptBundle'
 
-/**
- * 默认 CLI 配置适配器。
- * 支持多 provider 配置和运行时模型切换。
- */
 export class DefaultCliConfigAdapter implements CliConfigPort {
   private modelConfig: ModelConfig | null = null
   private providers: ProvidersMap = {}
+  private promptBundle: PromptBundle | null = null
+
+  setPromptBundle(bundle: PromptBundle): void {
+    this.promptBundle = bundle
+  }
 
   setModelConfig(config: ModelConfig): void {
     this.modelConfig = config
@@ -25,13 +23,18 @@ export class DefaultCliConfigAdapter implements CliConfigPort {
   }
 
   getAssistantProfile(): AssistantProfile {
-    return createDefaultAssistantProfile()
+    return this.getPromptBundle().profile
+  }
+
+  getAssistantPromptSet(): AssistantPromptSet {
+    return this.getPromptBundle().promptSet
   }
 
   getModelConfig(): ModelConfig {
     if (!this.modelConfig) {
       throw new Error('ModelConfig not loaded yet. Call setModelConfig() during bootstrap.')
     }
+
     return this.modelConfig
   }
 
@@ -41,10 +44,14 @@ export class DefaultCliConfigAdapter implements CliConfigPort {
 
   switchModel(providerName: string, modelName?: string): ModelConfig | null {
     const provider = this.providers[providerName]
-    if (!provider) return null
+    if (!provider) {
+      return null
+    }
 
     const model = modelName ?? provider.models[0]
-    if (!model) return null
+    if (!model) {
+      return null
+    }
 
     const newConfig: ModelConfig = {
       provider: provider.provider,
@@ -61,10 +68,18 @@ export class DefaultCliConfigAdapter implements CliConfigPort {
   }
 
   getToolCatalog(): ToolDescriptor[] {
-    return createDefaultToolCatalog()
+    return this.getPromptBundle().toolCatalog
   }
 
   getLocalCommands(): string[] {
-    return createDefaultLocalCommands()
+    return this.getPromptBundle().localCommands
+  }
+
+  private getPromptBundle(): PromptBundle {
+    if (!this.promptBundle) {
+      throw new Error('PromptBundle not loaded yet. Call setPromptBundle() during bootstrap.')
+    }
+
+    return this.promptBundle
   }
 }

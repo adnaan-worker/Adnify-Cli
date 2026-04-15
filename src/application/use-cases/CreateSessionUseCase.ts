@@ -1,5 +1,6 @@
-import { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
 import type { AssistantMode } from '../../domain/assistant/value-objects/AssistantMode'
+import { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
+import type { AppI18n } from '../i18n/AppI18n'
 import type { ClockPort } from '../ports/ClockPort'
 import type { IdGeneratorPort } from '../ports/IdGeneratorPort'
 import type { LoggerPort } from '../ports/LoggerPort'
@@ -9,7 +10,6 @@ export interface CreateSessionCommand {
   workspacePath: string
   mode: AssistantMode
   title?: string
-  welcomeMessage?: string
 }
 
 /**
@@ -22,13 +22,14 @@ export class CreateSessionUseCase {
     private readonly idGenerator: IdGeneratorPort,
     private readonly clock: ClockPort,
     private readonly logger: LoggerPort,
+    private readonly i18n: AppI18n,
   ) {}
 
   async execute(command: CreateSessionCommand): Promise<ConversationSession> {
     const now = this.clock.now()
     const session = ConversationSession.create({
       id: this.idGenerator.next(),
-      title: command.title ?? 'Adnify-Cli Session',
+      title: command.title ?? this.i18n.t('session.defaultTitle'),
       mode: command.mode,
       workspacePath: command.workspacePath,
       createdAt: now,
@@ -38,7 +39,6 @@ export class CreateSessionUseCase {
     this.logger.info('Created new session', {
       sessionId: session.id,
       mode: session.mode,
-      hasWelcomeMessage: Boolean(command.welcomeMessage),
     })
 
     return session

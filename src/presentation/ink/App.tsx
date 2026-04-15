@@ -22,6 +22,7 @@ export function App(props: AppProps) {
     cwd: props.cwd,
     onExit: exit,
   })
+  const { i18n } = props.runtime
 
   useInput(controller.handleInput)
 
@@ -31,21 +32,26 @@ export function App(props: AppProps) {
         <HeaderBar
           appName="Adnify-Cli"
           author="adnaan"
-          tagline="Command your codebase with calm precision."
-          workspaceName="booting"
+          tagline={i18n.t('assistant.tagline')}
+          workspaceName={i18n.t('app.boot.workspaceName')}
           packageManager="bun"
           mode="agent"
-          modelLabel="initializing"
+          modelLabel={i18n.t('app.boot.modelLabel')}
           busy
+          i18n={i18n}
         />
         <Box width="100%" marginTop={1}>
-          <Panel title="Boot" subtitle="runtime warmup" accent="brand">
+          <Panel
+            title={i18n.t('app.boot.panelTitle')}
+            subtitle={i18n.t('app.boot.panelSubtitle')}
+            accent="brand"
+          >
             <Box flexDirection="column" marginTop={1}>
               <Box gap={1}>
-                <ActivityPulse active color={adnifyTheme.brandStrong} idleFrame="·" />
-                <Text color={adnifyTheme.brand}>正在启动 Adnify-Cli</Text>
+                <ActivityPulse active color={adnifyTheme.brandStrong} idleFrame="*" />
+                <Text color={adnifyTheme.brand}>{i18n.t('app.boot.heading')}</Text>
               </Box>
-              <Text color={adnifyTheme.textMuted}>正在装配运行时、工作区上下文与模型配置。</Text>
+              <Text color={adnifyTheme.textMuted}>{i18n.t('app.boot.description')}</Text>
             </Box>
           </Panel>
         </Box>
@@ -56,7 +62,7 @@ export function App(props: AppProps) {
   if (!controller.bootstrap || !controller.session) {
     return (
       <Box width="100%" flexDirection="column" paddingX={1} paddingY={1}>
-        <Text color={adnifyTheme.danger}>启动失败</Text>
+        <Text color={adnifyTheme.danger}>{i18n.t('app.boot.failed')}</Text>
         <Newline />
         <Text color={adnifyTheme.textPrimary}>{controller.statusLine}</Text>
       </Box>
@@ -77,8 +83,8 @@ export function App(props: AppProps) {
         <EmptyState
           assistantName={profile.name}
           author={profile.author}
-          tagline={profile.tagline}
-          description={profile.description}
+          tagline={i18n.t('assistant.tagline')}
+          description={i18n.t('assistant.description')}
           workspaceName={workspace.rootPath.split(/[\\/]/).filter(Boolean).pop() ?? workspace.rootPath}
           packageManager={workspace.packageManager}
           isGitRepository={workspace.isGitRepository}
@@ -86,27 +92,30 @@ export function App(props: AppProps) {
           modelLabel={modelLabel}
           busy={controller.isBusy}
           commands={controller.bootstrap.localCommands}
+          i18n={i18n}
         />
       ) : (
         <>
           <HeaderBar
             appName={profile.name}
             author={profile.author}
-            tagline={profile.tagline}
+            tagline={i18n.t('assistant.tagline')}
             workspaceName={workspace.rootPath.split(/[\\/]/).filter(Boolean).pop() ?? workspace.rootPath}
             packageManager={workspace.packageManager}
             isGitRepository={workspace.isGitRepository}
             mode={controller.session.mode}
             modelLabel={modelLabel}
             busy={controller.isBusy}
+            i18n={i18n}
           />
 
           <Box width="100%" marginTop={1} flexDirection="column">
-          <ConversationViewport
-            messages={messages}
-            streamingText={controller.streamingText}
-            configInitPrompt={controller.configInitPrompt}
-          />
+            <ConversationViewport
+              messages={messages}
+              streamingText={controller.streamingText}
+              configInitPrompt={controller.configInitPrompt}
+              i18n={i18n}
+            />
           </Box>
         </>
       )}
@@ -120,6 +129,7 @@ export function App(props: AppProps) {
           commandSuggestions={controller.commandSuggestions}
           selectedSuggestionIndex={controller.selectedSuggestionIndex}
           isSuggestionOpen={controller.isSuggestionOpen}
+          i18n={i18n}
         />
       </Box>
 
@@ -127,6 +137,7 @@ export function App(props: AppProps) {
         statusLine={controller.statusLine}
         isBusy={controller.isBusy}
         isConfigured={Boolean(modelConfig.apiKey)}
+        i18n={i18n}
       />
     </Box>
   )

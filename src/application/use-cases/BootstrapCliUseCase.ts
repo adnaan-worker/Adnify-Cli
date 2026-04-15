@@ -1,5 +1,6 @@
 import { ASSISTANT_MODES } from '../../domain/assistant/value-objects/AssistantMode'
 import type { BootstrapSnapshot } from '../dto/BootstrapSnapshot'
+import type { AppI18n } from '../i18n/AppI18n'
 import type { CliConfigPort } from '../ports/CliConfigPort'
 import type { LoggerPort } from '../ports/LoggerPort'
 import type { WorkspaceContextPort } from '../ports/WorkspaceContextPort'
@@ -16,35 +17,23 @@ export class BootstrapCliUseCase {
     private readonly workspaceContextPort: WorkspaceContextPort,
     private readonly config: CliConfigPort,
     private readonly logger: LoggerPort,
+    private readonly i18n: AppI18n,
   ) {}
 
   async execute(command: BootstrapCliCommand): Promise<BootstrapSnapshot> {
-    this.logger.info('Bootstrapping Adnify-Cli runtime', { cwd: command.cwd })
-
-    const profile = this.config.getAssistantProfile()
-    const workspace = await this.workspaceContextPort.inspect(command.cwd)
-    const toolCatalog = this.config.getToolCatalog()
-    const localCommands = this.config.getLocalCommands()
-    const modelConfig = this.config.getModelConfig()
-    const providers = this.config.getProviders()
+    this.logger.info(
+      this.i18n.locale === 'en' ? 'Bootstrapping Adnify-Cli runtime' : '正在启动 Adnify-Cli 运行时',
+      { cwd: command.cwd },
+    )
 
     return {
-      profile,
-      workspace,
-      modelConfig,
-      providers,
-      toolCatalog,
-      localCommands,
+      profile: this.config.getAssistantProfile(),
+      workspace: await this.workspaceContextPort.inspect(command.cwd),
+      modelConfig: this.config.getModelConfig(),
+      providers: this.config.getProviders(),
+      toolCatalog: this.config.getToolCatalog(),
+      localCommands: this.config.getLocalCommands(),
       supportedModes: [...ASSISTANT_MODES],
-      welcomeMessage: [
-        `${profile.name} 已完成初始启动。`,
-        `当前工作区：${workspace.rootPath}`,
-        `默认模式：${profile.defaultMode}`,
-        modelConfig.apiKey
-          ? `当前模型：${modelConfig.model} (${modelConfig.baseUrl})`
-          : '尚未检测到 API Key，可输入 :config 查看配置说明。',
-        '输入 :help 查看本地命令，直接输入自然语言即可开始对话。',
-      ].join('\n'),
     }
   }
 }

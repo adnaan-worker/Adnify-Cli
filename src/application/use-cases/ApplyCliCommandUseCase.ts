@@ -1,6 +1,8 @@
 import { ASSISTANT_MODES, isAssistantMode } from '../../domain/assistant/value-objects/AssistantMode'
 import type { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
+import type { ToolDescriptor } from '../../domain/tooling/entities/ToolDescriptor'
 import type { BootstrapSnapshot } from '../dto/BootstrapSnapshot'
+import type { AppI18n } from '../i18n/AppI18n'
 import type { ClockPort } from '../ports/ClockPort'
 import type { IdGeneratorPort } from '../ports/IdGeneratorPort'
 import type { LoggerPort } from '../ports/LoggerPort'
@@ -9,6 +11,7 @@ import {
   createCliCommandInputContent,
   createCliCommandOutputContent,
 } from '../support/CliTranscriptMarkup'
+import { formatWorkspaceSummary } from '../support/formatWorkspaceSummary'
 
 export interface ModelSwitcher {
   switchModel: (providerName: string, modelName?: string) => { model: string; baseUrl: string } | null
@@ -33,6 +36,7 @@ export class ApplyCliCommandUseCase {
     private readonly idGenerator: IdGeneratorPort,
     private readonly clock: ClockPort,
     private readonly logger: LoggerPort,
+    private readonly i18n: AppI18n,
   ) {}
 
   async execute(command: ApplyCliCommandCommand): Promise<ApplyCliCommandResult> {
@@ -80,10 +84,13 @@ export class ApplyCliCommandUseCase {
       case 'help': {
         addCommandInput()
         addCommandOutput(
-          ['本地命令列表：', ...command.bootstrap.localCommands.map((item) => `- ${item}`)].join('\n'),
-          { title: 'commands', tone: 'info' },
+          [
+            this.i18n.t('cli.help.title'),
+            ...command.bootstrap.localCommands.map((item) => `- ${item}`),
+          ].join('\n'),
+          { title: this.i18n.t('transcript.commands'), tone: 'info' },
         )
-        return persist('已输出本地命令帮助。')
+        return persist(this.i18n.t('cli.help.status'))
       }
 
       case 'mode': {
@@ -91,44 +98,47 @@ export class ApplyCliCommandUseCase {
         const nextMode = args[0]
 
         if (!nextMode || !isAssistantMode(nextMode)) {
-          addCommandOutput(`模式无效。可选模式：${ASSISTANT_MODES.join(', ')}`, {
-            title: 'mode',
-            tone: 'warning',
-          })
-          return persist('模式切换失败，请检查命令参数。')
+          addCommandOutput(
+            this.i18n.t('cli.mode.invalidOutput', {
+              modes: ASSISTANT_MODES.join(', '),
+            }),
+            {
+              title: this.i18n.t('transcript.mode'),
+              tone: 'warning',
+            },
+          )
+          return persist(this.i18n.t('cli.mode.invalidStatus'))
         }
 
         session.switchMode(nextMode, now)
-        addCommandOutput(`会话模式已切换为 ${nextMode}。`, {
-          title: 'mode',
+        addCommandOutput(this.i18n.t('cli.mode.changedOutput', { mode: nextMode }), {
+          title: this.i18n.t('transcript.mode'),
           tone: 'success',
         })
-        return persist(`当前模式：${nextMode}`)
+        return persist(this.i18n.t('cli.mode.changedStatus', { mode: nextMode }))
       }
 
       case 'workspace': {
         addCommandInput()
-        addCommandOutput(command.bootstrap.workspace.toSummaryText(), {
-          title: 'workspace',
+        addCommandOutput(formatWorkspaceSummary(command.bootstrap.workspace, this.i18n), {
+          title: this.i18n.t('transcript.workspace'),
           tone: 'info',
         })
-        return persist('已输出工作区摘要。')
+        return persist(this.i18n.t('cli.workspace.status'))
       }
 
       case 'tools': {
         addCommandInput()
         const toolsText = [
-          '当前规划的工具目录：',
-          ...command.bootstrap.toolCatalog.map(
-            (tool) => `- ${tool.name} [${tool.category}]：${tool.description}`,
-          ),
+          this.i18n.t('cli.tools.title'),
+          ...command.bootstrap.toolCatalog.map((tool) => formatToolLine(tool, this.i18n)),
         ].join('\n')
 
         addCommandOutput(toolsText, {
-          title: 'tools',
+          title: this.i18n.t('transcript.tools'),
           tone: 'info',
         })
-        return persist('已输出工具目录。')
+        return persist(this.i18n.t('cli.tools.status'))
       }
 
       case 'model': {
@@ -143,49 +153,68 @@ export class ApplyCliCommandUseCase {
 
           addCommandOutput(
             [
-              `当前模型：${modelConfig.model} (${modelConfig.baseUrl})`,
+              this.i18n.t('cli.model.current', {
+                model: modelConfig.model,
+                baseUrl: modelConfig.baseUrl,
+              }),
               '',
               providerList.length > 0
-                ? ['可用 Provider：', ...providerList].join('\n')
-                : '尚未配置额外 Provider，可在 ~/.adnify-cli/config.json 的 providers 字段中添加。',
+                ? [this.i18n.t('cli.model.providersTitle'), ...providerList].join('\n')
+                : this.i18n.t('cli.model.noProviders'),
               '',
-              '用法：/model <provider> [model]',
-              '示例：/model openai gpt-5',
+              this.i18n.t('cli.model.usage'),
+              this.i18n.t('cli.model.example'),
             ].join('\n'),
-            { title: 'model', tone: 'info' },
+            { title: this.i18n.t('transcript.model'), tone: 'info' },
           )
-          return persist(`当前模型：${modelConfig.model}`)
+          return persist(
+            this.i18n.t('cli.model.switchedStatus', {
+              model: modelConfig.model,
+            }),
+          )
         }
 
         const providerName = args[0]
         const modelName = args[1]
 
         if (!command.modelSwitcher) {
-          addCommandOutput('模型切换能力尚未就绪。', {
-            title: 'model',
+          addCommandOutput(this.i18n.t('cli.model.unavailable'), {
+            title: this.i18n.t('transcript.model'),
             tone: 'warning',
           })
-          return persist('模型切换失败。')
+          return persist(this.i18n.t('cli.model.unavailableStatus'))
         }
 
         const result = command.modelSwitcher.switchModel(providerName, modelName)
         if (!result) {
-          const available = Object.keys(providers).join(', ') || '无'
           addCommandOutput(
-            `Provider "${providerName}" 不存在或未配置模型。\n可用 Provider：${available}`,
+            this.i18n.t('cli.model.providerMissing', {
+              provider: providerName,
+              available: Object.keys(providers).join(', ') || this.i18n.t('workspace.none'),
+            }),
             {
-              title: 'model',
+              title: this.i18n.t('transcript.model'),
               tone: 'warning',
             },
           )
-          return persist(`切换失败：未找到 ${providerName}`)
+          return persist(
+            this.i18n.t('cli.model.providerMissingStatus', {
+              provider: providerName,
+            }),
+          )
         }
 
-        addCommandOutput(`已切换到 ${result.model} (${result.baseUrl})`, {
-          title: 'model',
-          tone: 'success',
-        })
-        return persist(`当前模型：${result.model}`)
+        addCommandOutput(
+          this.i18n.t('cli.model.switchedOutput', {
+            model: result.model,
+            baseUrl: result.baseUrl,
+          }),
+          {
+            title: this.i18n.t('transcript.model'),
+            tone: 'success',
+          },
+        )
+        return persist(this.i18n.t('cli.model.switchedStatus', { model: result.model }))
       }
 
       case 'config': {
@@ -193,58 +222,63 @@ export class ApplyCliCommandUseCase {
         const modelConfig = command.bootstrap.modelConfig
         const maskedKey = modelConfig.apiKey
           ? `${modelConfig.apiKey.slice(0, 6)}...${modelConfig.apiKey.slice(-4)}`
-          : '未配置'
+          : this.i18n.t('cli.config.unset')
 
         const configText = [
-          '当前模型配置：',
-          `- Provider：${modelConfig.provider}`,
-          `- API Key：${maskedKey}`,
-          `- Base URL：${modelConfig.baseUrl}`,
-          `- Model：${modelConfig.model}`,
-          `- Max Tokens：${modelConfig.maxTokens}`,
-          `- Temperature：${modelConfig.temperature}`,
-          `- Timeout：${modelConfig.timeoutMs}ms`,
+          this.i18n.t('cli.config.title'),
+          this.i18n.t('cli.config.provider', { value: modelConfig.provider }),
+          this.i18n.t('cli.config.apiKey', { value: maskedKey }),
+          this.i18n.t('cli.config.baseUrl', { value: modelConfig.baseUrl }),
+          this.i18n.t('cli.config.model', { value: modelConfig.model }),
+          this.i18n.t('cli.config.maxTokens', { value: modelConfig.maxTokens }),
+          this.i18n.t('cli.config.temperature', { value: modelConfig.temperature }),
+          this.i18n.t('cli.config.timeout', { value: modelConfig.timeoutMs }),
           '',
-          '配置方式：',
-          '1. 创建 ~/.adnify-cli/config.json',
-          '2. 或设置环境变量：ADNIFY_API_KEY、ADNIFY_BASE_URL、ADNIFY_MODEL、ADNIFY_PROVIDER',
+          this.i18n.t('cli.config.howTo'),
+          this.i18n.t('cli.config.howToFile'),
+          this.i18n.t('cli.config.howToEnv'),
         ].join('\n')
 
         addCommandOutput(configText, {
-          title: 'config',
+          title: this.i18n.t('transcript.config'),
           tone: 'info',
         })
-        return persist('已输出模型配置。')
+        return persist(this.i18n.t('cli.config.status'))
       }
 
       case 'clear': {
         session.clearConversation(now)
         addCommandInput()
-        addCommandOutput('会话已清空，但工作区上下文和当前模式仍然保留。', {
-          title: 'conversation',
+        addCommandOutput(this.i18n.t('cli.clear.output'), {
+          title: this.i18n.t('transcript.conversation'),
           tone: 'success',
         })
-        return persist('会话已清空。')
+        return persist(this.i18n.t('cli.clear.status'))
       }
 
       case 'exit': {
         addCommandInput()
-        addCommandOutput('正在退出 Adnify-Cli...', {
-          title: 'session',
+        addCommandOutput(this.i18n.t('cli.exit.output'), {
+          title: this.i18n.t('transcript.session'),
           tone: 'info',
         })
 
         this.logger.info('User requested CLI exit', { sessionId: command.sessionId })
-        return persist('正在退出 Adnify-Cli...', { shouldExit: true })
+        return persist(this.i18n.t('cli.exit.status'), { shouldExit: true })
       }
 
       default: {
         addCommandInput()
-        addCommandOutput(`未知命令：${verb || '<empty>'}。输入 /help 查看可用命令。`, {
-          title: 'command',
-          tone: 'warning',
-        })
-        return persist('命令无法识别。')
+        addCommandOutput(
+          this.i18n.t('cli.unknown.output', {
+            command: verb || '<empty>',
+          }),
+          {
+            title: this.i18n.t('transcript.command'),
+            tone: 'warning',
+          },
+        )
+        return persist(this.i18n.t('cli.unknown.status'))
       }
     }
   }
@@ -256,4 +290,16 @@ function normalizeCommandLine(commandLine: string): string {
 
 function toDisplayCommand(commandLine: string): string {
   return commandLine ? `/${commandLine}` : '/'
+}
+
+function formatToolLine(tool: ToolDescriptor, i18n: AppI18n): string {
+  return `- ${localizeToolName(tool, i18n)} [${tool.category}]: ${localizeToolDescription(tool, i18n)}`
+}
+
+function localizeToolName(tool: ToolDescriptor, i18n: AppI18n): string {
+  return i18n.maybeT(`tool.${tool.id}.name`) ?? tool.name
+}
+
+function localizeToolDescription(tool: ToolDescriptor, i18n: AppI18n): string {
+  return i18n.maybeT(`tool.${tool.id}.description`) ?? tool.description
 }

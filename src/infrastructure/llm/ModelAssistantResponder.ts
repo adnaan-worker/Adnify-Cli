@@ -1,24 +1,25 @@
+import type { AssistantPromptSet } from '../../application/dto/AssistantPromptSet'
+import type { AppI18n } from '../../application/i18n/AppI18n'
 import type {
   AssistantReply,
   AssistantResponderCommand,
   AssistantResponderPort,
   AssistantStreamChunk,
 } from '../../application/ports/AssistantResponderPort'
+import type { CliConfigPort } from '../../application/ports/CliConfigPort'
 import type { LoggerPort } from '../../application/ports/LoggerPort'
 import type { ModelGatewayPort, ModelMessage } from '../../application/ports/ModelGatewayPort'
+import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import type { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
 import type { WorkspaceContext } from '../../domain/workspace/entities/WorkspaceContext'
-import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 
-/**
- * 真实模型助手响应器。
- * 将会话历史和工作区上下文组装为 model messages，通过 ModelGatewayPort 调用 LLM。
- */
 export class ModelAssistantResponder implements AssistantResponderPort {
   constructor(
     private gateway: ModelGatewayPort,
     private config: ModelConfig,
+    private readonly cliConfig: CliConfigPort,
     private readonly logger: LoggerPort,
+    private readonly i18n: AppI18n,
   ) {}
 
   updateGateway(gateway: ModelGatewayPort, config: ModelConfig): void {
@@ -35,7 +36,7 @@ export class ModelAssistantResponder implements AssistantResponderPort {
   }
 
   async *streamReply(command: AssistantResponderCommand): AsyncIterable<AssistantStreamChunk> {
-    const messages = this.buildMessages(command.session, command.workspace, command.prompt)
+    const messages = this.buildMessages(command)
 
     this.logger.debug('Sending request to model gateway', {
       model: this.config.model,
@@ -64,31 +65,70 @@ export class ModelAssistantResponder implements AssistantResponderPort {
     }
   }
 
-  private buildMessages(
-    session: ConversationSession,
-    workspace: WorkspaceContext,
-    currentPrompt: string,
-  ): ModelMessage[] {
-    const systemPrompt = [
-      `你是 Adnify-Cli，一个面向终端的 AI 编程助手。`,
-      `当前模式：${session.mode}`,
-      `工作区根目录：${workspace.rootPath}`,
-      `包管理器：${workspace.packageManager}`,
-      `Git 仓库：${workspace.isGitRepository ? '是' : '否'}`,
-      `顶层条目：${workspace.topLevelEntries.join(', ')}`,
-    ].join('\n')
+  private buildMessages(command: AssistantResponderCommand): ModelMessage[] {
+    const systemPrompt = this.buildSystemPrompt(
+      command.session,
+      command.workspace,
+      command.toolCatalog,
+      this.cliConfig.getAssistantPromptSet(),
+    )
 
     const messages: ModelMessage[] = [{ role: 'system', content: systemPrompt }]
 
-    for (const msg of session.getMessages()) {
-      if (msg.role === 'system') continue
-      messages.push({ role: msg.role, content: msg.content })
+    for (const message of command.session.getMessages()) {
+      if (message.role === 'system') {
+        continue
+      }
+
+      messages.push({ role: message.role, content: message.content })
     }
 
-    if (!messages.some((m) => m.role === 'user' && m.content === currentPrompt)) {
-      messages.push({ role: 'user', content: currentPrompt })
+    if (!messages.some((message) => message.role === 'user' && message.content === command.prompt)) {
+      messages.push({ role: 'user', content: command.prompt })
     }
 
     return messages
+  }
+
+  private buildSystemPrompt(
+    session: ConversationSession,
+    workspace: WorkspaceContext,
+    toolCatalog: AssistantResponderCommand['toolCatalog'],
+    promptSet: AssistantPromptSet,
+  ): string {
+    const modePrompt = promptSet.modes[session.mode]
+    const toolBlock =
+      toolCatalog
+        .map((tool) => `- ${tool.name} [${tool.category}] (${tool.riskLevel}): ${tool.description}`)
+        .join('\n') || this.i18n.t('modelPrompt.noTools')
+
+    const workspaceBlock = [
+      this.i18n.t('modelPrompt.currentMode', { mode: session.mode }),
+      this.i18n.t('modelPrompt.workspaceRoot', { value: workspace.rootPath }),
+      this.i18n.t('modelPrompt.packageManager', { value: workspace.packageManager }),
+      this.i18n.t('modelPrompt.gitRepository', {
+        value: this.i18n.t(workspace.isGitRepository ? 'common.yes' : 'common.no'),
+      }),
+      this.i18n.t('modelPrompt.topLevelEntries', {
+        value: workspace.topLevelEntries.join(', ') || this.i18n.t('workspace.none'),
+      }),
+    ].join('\n')
+
+    return [
+      promptSet.core.trim(),
+      '',
+      this.i18n.t('modelPrompt.respondIn', {
+        language: this.i18n.t('modelPrompt.language.self'),
+      }),
+      '',
+      '## Mode Instructions',
+      modePrompt.trim(),
+      '',
+      '## Runtime Workspace Context',
+      workspaceBlock,
+      '',
+      '## Available Tool Definitions',
+      toolBlock,
+    ].join('\n')
   }
 }

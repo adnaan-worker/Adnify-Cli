@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { ModelConfig } from '../../../domain/assistant/value-objects/ModelConfig'
 import { PROVIDER_PRESETS, type ProviderPreset } from '../../../infrastructure/config/providerPresets'
 import { writeModelConfig } from '../../../infrastructure/config/writeLocalConfig'
@@ -29,7 +30,7 @@ export interface ConfigInitResult {
  * 交互式模型配置向导。
  * 流程：选择 Provider -> 选择模型 -> 输入 Key -> 必要时输入 Base URL -> 确认保存。
  */
-export function useConfigInit(): ConfigInitState {
+export function useConfigInit(i18n: AppI18n): ConfigInitState {
   const [step, setStep] = useState<InitStep>('idle')
   const [errorText, setErrorText] = useState('')
   const chosen = useRef<{
@@ -49,58 +50,59 @@ export function useConfigInit(): ConfigInitState {
   const buildPromptText = useCallback((): string => {
     switch (step) {
       case 'select-provider': {
-        const lines = ['请选择 AI Provider：']
+        const lines = [i18n.t('config.selectProviderTitle')]
         PROVIDER_PRESETS.forEach((preset, index) => {
           lines.push(`  ${index + 1}. ${preset.label} (${preset.models.slice(0, 3).join(' / ')})`)
         })
-        lines.push(`  ${PROVIDER_PRESETS.length + 1}. 自定义 OpenAI 兼容端点`)
+        lines.push(`  ${PROVIDER_PRESETS.length + 1}. ${i18n.t('config.customProvider')}`)
         lines.push('')
-        lines.push('输入序号继续')
+        lines.push(i18n.t('config.enterIndexContinue'))
         return lines.join('\n')
       }
 
       case 'select-model': {
         const preset = chosen.current.preset
         if (!preset) {
-          return '请输入模型名称'
+          return i18n.t('config.selectModelInstruction')
         }
 
-        const lines = [`已选择 ${preset.label}，请选择模型：`]
+        const lines = [i18n.t('config.selectModelTitle', { provider: preset.label })]
         preset.models.forEach((model, index) => {
-          const isDefault = model === preset.defaultModel ? ' (默认)' : ''
+          const isDefault = model === preset.defaultModel ? i18n.t('config.defaultSuffix') : ''
           lines.push(`  ${index + 1}. ${model}${isDefault}`)
         })
         lines.push('')
-        lines.push('输入序号，或直接回车使用默认模型')
+        lines.push(i18n.t('config.selectModelInstruction'))
         return lines.join('\n')
       }
 
       case 'enter-apikey':
-        return '请输入 API Key'
+        return i18n.t('config.enterApiKey')
 
       case 'enter-baseurl':
-        return '请输入 Base URL，例如 https://api.example.com/v1'
+        return i18n.t('config.enterBaseUrl')
 
       case 'confirm': {
         const current = chosen.current
-        const masked = current.apiKey.length > 10
-          ? current.apiKey.slice(0, 6) + '...' + current.apiKey.slice(-4)
-          : current.apiKey || '(空)'
+        const masked =
+          current.apiKey.length > 10
+            ? `${current.apiKey.slice(0, 6)}...${current.apiKey.slice(-4)}`
+            : current.apiKey || '(empty)'
 
         return [
-          '确认配置：',
-          `  Base URL：${current.baseUrl}`,
-          `  Model：${current.model}`,
-          `  API Key：${masked}`,
+          i18n.t('config.confirmTitle'),
+          `  ${i18n.t('config.confirmBaseUrl', { value: current.baseUrl })}`,
+          `  ${i18n.t('config.confirmModel', { value: current.model })}`,
+          `  ${i18n.t('config.confirmApiKey', { value: masked })}`,
           '',
-          '输入 y 确认保存，输入 n 取消',
+          i18n.t('config.confirmInstruction'),
         ].join('\n')
       }
 
       default:
         return ''
     }
-  }, [step])
+  }, [i18n, step])
 
   const start = useCallback(() => {
     chosen.current = {
@@ -124,7 +126,7 @@ export function useConfigInit(): ConfigInitState {
         const maxIndex = PROVIDER_PRESETS.length
 
         if (Number.isNaN(index) || index < 0 || index > maxIndex) {
-          setErrorText(`请输入 1-${maxIndex + 1} 之间的序号`)
+          setErrorText(i18n.t('config.rangeError', { max: maxIndex + 1 }))
           return null
         }
 
@@ -155,7 +157,7 @@ export function useConfigInit(): ConfigInitState {
         } else {
           const index = Number.parseInt(trimmed, 10) - 1
           if (Number.isNaN(index) || index < 0 || index >= preset.models.length) {
-            setErrorText(`请输入 1-${preset.models.length} 之间的序号，或直接回车`)
+            setErrorText(i18n.t('config.modelRangeError', { max: preset.models.length }))
             return null
           }
           chosen.current.model = preset.models[index]!
@@ -167,7 +169,7 @@ export function useConfigInit(): ConfigInitState {
 
       case 'enter-baseurl': {
         if (!trimmed) {
-          setErrorText('Base URL 不能为空')
+          setErrorText(i18n.t('config.baseUrlRequired'))
           return null
         }
 
@@ -179,7 +181,7 @@ export function useConfigInit(): ConfigInitState {
 
       case 'enter-apikey': {
         if (!trimmed) {
-          setErrorText('API Key 不能为空')
+          setErrorText(i18n.t('config.apiKeyRequired'))
           return null
         }
 
@@ -201,7 +203,7 @@ export function useConfigInit(): ConfigInitState {
         }
 
         if (lower !== 'y') {
-          setErrorText('请输入 y 或 n')
+          setErrorText(i18n.t('config.confirmChoiceError'))
           return null
         }
 
@@ -222,9 +224,12 @@ export function useConfigInit(): ConfigInitState {
         return {
           config,
           message: [
-            '配置已保存到 ~/.adnify-cli/config.json',
-            `当前模型：${config.model} (${config.baseUrl})`,
-            '现在可以直接开始对话，或使用 :model 继续切换模型。',
+            i18n.t('config.savedLine1'),
+            i18n.t('config.savedLine2', {
+              model: config.model,
+              baseUrl: config.baseUrl,
+            }),
+            i18n.t('config.savedLine3'),
           ].join('\n'),
         }
       }
@@ -232,7 +237,7 @@ export function useConfigInit(): ConfigInitState {
       default:
         return null
     }
-  }, [step])
+  }, [i18n, step])
 
   return {
     isActive: step !== 'idle' && step !== 'done',

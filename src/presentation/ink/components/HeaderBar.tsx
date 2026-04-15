@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
 import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
 import { adnifyTheme } from '../theme'
@@ -16,6 +17,7 @@ export interface HeaderBarProps {
   mode: AssistantMode
   modelLabel: string
   busy?: boolean
+  i18n: AppI18n
 }
 
 function ModeBadge(props: { mode: AssistantMode; busy?: boolean }) {
@@ -48,7 +50,9 @@ function MetaPill(props: { label: string; value: string; color?: string }) {
 }
 
 export function HeaderBar(props: HeaderBarProps) {
-  const gitLabel = props.isGitRepository ? 'tracked' : 'detached'
+  const gitLabel = props.i18n.t(
+    props.isGitRepository ? 'header.meta.gitTracked' : 'header.meta.gitDetached',
+  )
   const gitColor = props.isGitRepository ? adnifyTheme.success : adnifyTheme.warm
 
   return (
@@ -60,16 +64,21 @@ export function HeaderBar(props: HeaderBarProps) {
             author={props.author}
             tagline={props.tagline}
             busy={props.busy}
+            i18n={props.i18n}
           />
 
           <Box gap={1} marginTop={1}>
             <ActivityPulse active={props.busy} color={adnifyTheme.brandStrong} idleFrame="*" />
-            <MetaPill label="workspace " value={props.workspaceName} />
+            <MetaPill label={props.i18n.t('header.meta.workspace')} value={props.workspaceName} />
             {props.packageManager ? (
-              <MetaPill label="pkg " value={props.packageManager} color={adnifyTheme.brandSoft} />
+              <MetaPill
+                label={props.i18n.t('header.meta.package')}
+                value={props.packageManager}
+                color={adnifyTheme.brandSoft}
+              />
             ) : null}
             {props.isGitRepository !== undefined ? (
-              <MetaPill label="git " value={gitLabel} color={gitColor} />
+              <MetaPill label={props.i18n.t('header.meta.git')} value={gitLabel} color={gitColor} />
             ) : null}
           </Box>
         </Box>

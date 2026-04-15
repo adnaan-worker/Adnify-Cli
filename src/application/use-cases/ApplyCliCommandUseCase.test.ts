@@ -4,11 +4,12 @@ import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConf
 import { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
 import { ToolDescriptor } from '../../domain/tooling/entities/ToolDescriptor'
 import { WorkspaceContext } from '../../domain/workspace/entities/WorkspaceContext'
-import { parseCliTranscriptMarkup } from '../support/CliTranscriptMarkup'
+import { createAppI18n } from '../i18n/AppI18n'
 import type { ClockPort } from '../ports/ClockPort'
 import type { IdGeneratorPort } from '../ports/IdGeneratorPort'
 import type { LoggerPort } from '../ports/LoggerPort'
 import type { SessionRepositoryPort } from '../ports/SessionRepositoryPort'
+import { parseCliTranscriptMarkup } from '../support/CliTranscriptMarkup'
 import { ApplyCliCommandUseCase } from './ApplyCliCommandUseCase'
 
 function createMockLogger(): LoggerPort {
@@ -78,15 +79,14 @@ function createBootstrapSnapshot() {
     supportedModes: ['chat', 'agent', 'plan'],
     toolCatalog: [
       new ToolDescriptor({
-        id: 'shell',
-        name: 'shell',
+        id: 'shell-runner',
+        name: 'Shell Runner',
         description: 'run shell commands',
         category: 'execution',
         riskLevel: 'careful',
       }),
     ],
     localCommands: [':help', ':mode chat', ':workspace', ':tools', ':model', ':config', ':clear'],
-    welcomeMessage: 'hello',
   }
 }
 
@@ -107,6 +107,7 @@ describe('ApplyCliCommandUseCase', () => {
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:01:00.000Z')),
       createMockLogger(),
+      createAppI18n('zh-CN'),
     )
 
     const result = await useCase.execute({
@@ -125,7 +126,7 @@ describe('ApplyCliCommandUseCase', () => {
 
     expect(parseCliTranscriptMarkup(messages[1]?.content ?? '')).toEqual({
       kind: 'command-output',
-      title: 'commands',
+      title: '命令',
       tone: 'info',
       content: '本地命令列表：\n- :help\n- :mode chat\n- :workspace\n- :tools\n- :model\n- :config\n- :clear',
     })
@@ -153,6 +154,7 @@ describe('ApplyCliCommandUseCase', () => {
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:02:00.000Z')),
       createMockLogger(),
+      createAppI18n('zh-CN'),
     )
 
     const result = await useCase.execute({
@@ -169,7 +171,7 @@ describe('ApplyCliCommandUseCase', () => {
     })
     expect(parseCliTranscriptMarkup(messages[1]?.content ?? '')).toEqual({
       kind: 'command-output',
-      title: 'conversation',
+      title: '会话',
       tone: 'success',
       content: '会话已清空，但工作区上下文和当前模式仍然保留。',
     })

@@ -29,14 +29,4 @@ export class WorkspaceContext {
   get topLevelEntries(): string[] {
     return [...this.props.topLevelEntries]
   }
-
-  toSummaryText(): string {
-    return [
-      '工作区摘要：',
-      `- 根目录：${this.props.rootPath}`,
-      `- Git 仓库：${this.props.isGitRepository ? '是' : '否'}`,
-      `- 包管理器：${this.props.packageManager}`,
-      `- 顶层条目：${this.props.topLevelEntries.join(', ') || '无'}`,
-    ].join('\n')
-  }
 }

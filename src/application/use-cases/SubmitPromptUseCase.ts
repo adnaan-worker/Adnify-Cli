@@ -1,4 +1,5 @@
 import type { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
+import type { AppI18n } from '../i18n/AppI18n'
 import type { AssistantResponderPort } from '../ports/AssistantResponderPort'
 import type { CliConfigPort } from '../ports/CliConfigPort'
 import type { ClockPort } from '../ports/ClockPort'
@@ -36,6 +37,7 @@ export class SubmitPromptUseCase {
     private readonly idGenerator: IdGeneratorPort,
     private readonly clock: ClockPort,
     private readonly logger: LoggerPort,
+    private readonly i18n: AppI18n,
   ) {}
 
   updateResponder(responder: AssistantResponderPort): void {
@@ -43,14 +45,11 @@ export class SubmitPromptUseCase {
   }
 
   async execute(command: SubmitPromptCommand): Promise<SubmitPromptResult> {
-    const session = await this.sessionRepository.findById(command.sessionId)
-    if (!session) {
-      throw new Error(`Session not found: ${command.sessionId}`)
-    }
-
+    const session = await this.getSession(command.sessionId)
     const prompt = command.prompt.trim()
+
     if (!prompt) {
-      return { session, statusLine: '输入为空，已忽略。' }
+      return { session, statusLine: this.i18n.t('status.inputIgnored') }
     }
 
     const now = this.clock.now()
@@ -73,7 +72,7 @@ export class SubmitPromptUseCase {
       promptLength: prompt.length,
     })
 
-    return { session, statusLine: '已完成一轮响应。' }
+    return { session, statusLine: this.i18n.t('status.responseCompleted') }
   }
 
   /**
@@ -84,14 +83,11 @@ export class SubmitPromptUseCase {
     command: SubmitPromptCommand,
     callbacks: StreamingCallbacks,
   ): Promise<SubmitPromptResult> {
-    const session = await this.sessionRepository.findById(command.sessionId)
-    if (!session) {
-      throw new Error(`Session not found: ${command.sessionId}`)
-    }
-
+    const session = await this.getSession(command.sessionId)
     const prompt = command.prompt.trim()
+
     if (!prompt) {
-      return { session, statusLine: '输入为空，已忽略。' }
+      return { session, statusLine: this.i18n.t('status.inputIgnored') }
     }
 
     const now = this.clock.now()
@@ -126,7 +122,7 @@ export class SubmitPromptUseCase {
         replyLength: fullContent.length,
       })
 
-      return { session, statusLine: '已完成一轮响应。' }
+      return { session, statusLine: this.i18n.t('status.responseCompleted') }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error))
       callbacks.onError(err)
@@ -136,7 +132,9 @@ export class SubmitPromptUseCase {
         session.addAssistantMessage(
           this.idGenerator.next(),
           this.clock.now(),
-          `${partial}\n\n[响应中断]`,
+          `${partial}\n\n[${
+            this.i18n.locale === 'en' ? 'Response interrupted' : '响应中断'
+          }]`,
         )
         await this.sessionRepository.save(session)
       }
@@ -146,7 +144,19 @@ export class SubmitPromptUseCase {
         error: err.message,
       })
 
-      return { session, statusLine: `响应失败：${err.message}` }
+      return {
+        session,
+        statusLine: this.i18n.t('status.responseFailed', { message: err.message }),
+      }
     }
+  }
+
+  private async getSession(sessionId: string): Promise<ConversationSession> {
+    const session = await this.sessionRepository.findById(sessionId)
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`)
+    }
+
+    return session
   }
 }

@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
 import { adnifyTheme } from '../theme'
 import { ActivityPulse } from './ActivityPulse'
@@ -14,43 +15,40 @@ export interface InputDockProps {
   commandSuggestions: CommandSuggestionItem[]
   selectedSuggestionIndex: number
   isSuggestionOpen: boolean
-}
-
-function placeholderText(busy: boolean): string {
-  if (busy) {
-    return 'Working on the current task...'
-  }
-
-  return 'Describe the task, or type / to open commands.'
+  i18n: AppI18n
 }
 
 export function InputDock(props: InputDockProps) {
   return (
-    <Panel title="Console" accent={props.busy ? 'brand' : 'muted'}>
+    <Panel
+      title={props.isSuggestionOpen ? props.i18n.t('input.panelCommands') : props.i18n.t('input.panelConsole')}
+      accent={props.busy ? 'brand' : 'muted'}
+    >
       <Box width="100%" justifyContent="space-between" alignItems="center">
-        <Box gap={1}>
+        <Box gap={1} alignItems="center">
           <ActivityPulse
             active={props.busy}
             color={props.busy ? adnifyTheme.brandStrong : adnifyTheme.textDim}
             idleFrame="*"
           />
-          <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.textMuted}>
-            {props.busy ? 'responding' : 'ready'}
+          <Text color={adnifyTheme.textDim}>
+            {props.isSuggestionOpen ? '/' : props.i18n.t('input.labelInput')}
           </Text>
         </Box>
 
         <Text color={adnifyTheme.textDim}>
-          {props.isSuggestionOpen ? 'command palette' : `mode ${props.mode}`}
+          {props.isSuggestionOpen ? props.i18n.t('input.labelPalette') : props.mode}
         </Text>
       </Box>
 
-      <Box marginTop={1}>
-        <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.success}>{props.busy ? '...' : '>'}</Text>
-        <Text> </Text>
+      <Box marginTop={1} gap={1}>
+        <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.success}>{'>'}</Text>
         {props.value ? (
           <Text color={adnifyTheme.textPrimary}>{props.value}</Text>
+        ) : props.busy ? (
+          <Text color={adnifyTheme.textDim}>{' '}</Text>
         ) : (
-          <Text color={adnifyTheme.textDim}>{placeholderText(props.busy)}</Text>
+          <Text color={adnifyTheme.textDim}>{props.i18n.t('input.placeholder')}</Text>
         )}
       </Box>
 
@@ -60,13 +58,11 @@ export function InputDock(props: InputDockProps) {
             items={props.commandSuggestions}
             selectedIndex={props.selectedSuggestionIndex}
           />
-          <Text color={adnifyTheme.textDim}>Up/Down select  Tab complete  Enter run</Text>
+          <Text color={adnifyTheme.textDim}>{props.i18n.t('input.hintSuggestions')}</Text>
         </Box>
-      ) : (
-        <Text color={adnifyTheme.textDim} wrap="truncate-end">
-          Enter to send. Model: {props.modelLabel}
-        </Text>
-      )}
+      ) : !props.busy ? (
+        <Text color={adnifyTheme.textDim}>{props.i18n.t('input.hintDefault')}</Text>
+      ) : null}
     </Panel>
   )
 }

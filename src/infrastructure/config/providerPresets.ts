@@ -45,14 +45,14 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     models: ['deepseek-chat', 'deepseek-reasoner'],
   },
   {
-    label: 'MiniMaxi',
+    label: 'MiniMax',
     provider: 'openai-compatible',
     baseUrl: 'https://api.minimaxi.com/v1',
     defaultModel: 'MiniMax-M2.7',
     models: ['MiniMax-M2.7'],
   },
   {
-    label: 'Ollama (本地)',
+    label: 'Ollama (Local)',
     provider: 'openai-compatible',
     baseUrl: 'http://localhost:11434/v1',
     defaultModel: 'llama3',

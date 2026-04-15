@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import type { AppI18n } from '../../../application/i18n/AppI18n'
 import {
   parseCliTranscriptMarkup,
   type CliTranscriptPayload,
@@ -13,6 +14,7 @@ export interface ConversationViewportProps {
   messages: ConversationMessage[]
   streamingText?: string
   configInitPrompt?: string
+  i18n: AppI18n
 }
 
 function resolveToneColor(tone: CliTranscriptTone): string {
@@ -60,24 +62,24 @@ function PromptMessage(props: { content: string }) {
   )
 }
 
-function AssistantMessageBlock(props: { content: string }) {
+function AssistantMessageBlock(props: { content: string; i18n: AppI18n }) {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box gap={1}>
         <Text color={adnifyTheme.brand}>adnify</Text>
-        <Text color={adnifyTheme.textDim}>response</Text>
+        <Text color={adnifyTheme.textDim}>{props.i18n.t('conversation.response')}</Text>
       </Box>
       <BodyText content={props.content} color={adnifyTheme.textPrimary} indent={2} />
     </Box>
   )
 }
 
-function SystemNotice(props: { content: string }) {
+function SystemNotice(props: { content: string; i18n: AppI18n }) {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box gap={1}>
-        <Text color={adnifyTheme.textDim}>·</Text>
-        <Text color={adnifyTheme.textSecondary}>notice</Text>
+        <Text color={adnifyTheme.textDim}>*</Text>
+        <Text color={adnifyTheme.textSecondary}>{props.i18n.t('conversation.notice')}</Text>
       </Box>
       <BodyText content={props.content} color={adnifyTheme.textMuted} indent={2} />
     </Box>
@@ -97,16 +99,17 @@ function CommandOutputBlock(props: {
   content: string
   title?: string
   tone: CliTranscriptTone
+  i18n: AppI18n
 }) {
   const accentColor = resolveToneColor(props.tone)
 
   return (
     <Box marginTop={1}>
-      <Text color={accentColor}>│</Text>
+      <Text color={accentColor}>{'|'}</Text>
       <Box flexDirection="column" marginLeft={1}>
         <Box gap={1}>
-          <Text color={accentColor}>{props.title ?? 'output'}</Text>
-          <Text color={adnifyTheme.textDim}>local command</Text>
+          <Text color={accentColor}>{props.title ?? props.i18n.t('conversation.output')}</Text>
+          <Text color={adnifyTheme.textDim}>{props.i18n.t('conversation.localCommand')}</Text>
         </Box>
         <BodyText content={props.content} color={adnifyTheme.textSecondary} />
       </Box>
@@ -118,14 +121,15 @@ function NoticeBlock(props: {
   content: string
   title?: string
   tone: CliTranscriptTone
+  i18n: AppI18n
 }) {
   const accentColor = resolveToneColor(props.tone)
 
   return (
     <Box marginTop={1}>
-      <Text color={accentColor}>•</Text>
+      <Text color={accentColor}>{'~'}</Text>
       <Box flexDirection="column" marginLeft={1}>
-        <Text color={accentColor}>{props.title ?? 'notice'}</Text>
+        <Text color={accentColor}>{props.title ?? props.i18n.t('conversation.notice')}</Text>
         <BodyText content={props.content} color={adnifyTheme.textMuted} />
       </Box>
     </Box>
@@ -135,6 +139,7 @@ function NoticeBlock(props: {
 function renderStructuredMessage(
   markup: CliTranscriptPayload,
   fallbackMessage: ConversationMessage,
+  i18n: AppI18n,
 ) {
   switch (markup.kind) {
     case 'command-input':
@@ -145,30 +150,33 @@ function renderStructuredMessage(
           content={markup.content}
           title={markup.title}
           tone={markup.tone}
+          i18n={i18n}
         />
       )
     case 'notice':
-      return <NoticeBlock content={markup.content} title={markup.title} tone={markup.tone} />
+      return (
+        <NoticeBlock content={markup.content} title={markup.title} tone={markup.tone} i18n={i18n} />
+      )
     default:
-      return <SystemNotice content={fallbackMessage.content} />
+      return <SystemNotice content={fallbackMessage.content} i18n={i18n} />
   }
 }
 
-function MessageBlock(props: { message: ConversationMessage }) {
+function MessageBlock(props: { message: ConversationMessage; i18n: AppI18n }) {
   const structured = parseCliTranscriptMarkup(props.message.content)
 
   if (structured) {
-    return renderStructuredMessage(structured, props.message)
+    return renderStructuredMessage(structured, props.message, props.i18n)
   }
 
   switch (props.message.role) {
     case 'assistant':
-      return <AssistantMessageBlock content={props.message.content} />
+      return <AssistantMessageBlock content={props.message.content} i18n={props.i18n} />
     case 'user':
       return <PromptMessage content={props.message.content} />
     case 'system':
     default:
-      return <SystemNotice content={props.message.content} />
+      return <SystemNotice content={props.message.content} i18n={props.i18n} />
   }
 }
 
@@ -189,13 +197,13 @@ function ConfigWizard(props: { prompt: string }) {
   )
 }
 
-function StreamingBlock(props: { text: string }) {
+function StreamingBlock(props: { text: string; i18n: AppI18n }) {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box gap={1}>
         <Text color={adnifyTheme.brand}>adnify</Text>
         <ActivityPulse active color={adnifyTheme.brandStrong} idleFrame="*" />
-        <Text color={adnifyTheme.textDim}>thinking</Text>
+        <Text color={adnifyTheme.textDim}>{props.i18n.t('conversation.thinking')}</Text>
       </Box>
       <BodyText content={props.text} color={adnifyTheme.textPrimary} indent={2} />
     </Box>
@@ -207,17 +215,19 @@ export function ConversationViewport(props: ConversationViewportProps) {
 
   return (
     <Panel
-      title="Session"
-      subtitle={showConfigWizard ? 'configuration' : undefined}
+      title={props.i18n.t('conversation.panelSession')}
+      subtitle={showConfigWizard ? props.i18n.t('conversation.panelConfiguration') : undefined}
       accent={showConfigWizard ? 'warm' : 'muted'}
     >
       {showConfigWizard ? <ConfigWizard prompt={props.configInitPrompt ?? ''} /> : null}
 
       {!showConfigWizard && props.messages.length > 0
-        ? props.messages.map((message) => <MessageBlock key={message.id} message={message} />)
+        ? props.messages.map((message) => (
+            <MessageBlock key={message.id} message={message} i18n={props.i18n} />
+          ))
         : null}
 
-      {props.streamingText ? <StreamingBlock text={props.streamingText} /> : null}
+      {props.streamingText ? <StreamingBlock text={props.streamingText} i18n={props.i18n} /> : null}
     </Panel>
   )
 }

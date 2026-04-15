@@ -1,8 +1,12 @@
 import { describe, expect, test } from 'bun:test'
+import { AssistantProfile } from '../../domain/assistant/entities/AssistantProfile'
+import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
+import { WorkspaceContext } from '../../domain/workspace/entities/WorkspaceContext'
+import type { AssistantPromptSet } from '../dto/AssistantPromptSet'
+import { createAppI18n } from '../i18n/AppI18n'
 import type {
   AssistantReply,
-  AssistantResponderCommand,
   AssistantResponderPort,
   AssistantStreamChunk,
 } from '../ports/AssistantResponderPort'
@@ -13,9 +17,6 @@ import type { LoggerPort } from '../ports/LoggerPort'
 import type { SessionRepositoryPort } from '../ports/SessionRepositoryPort'
 import type { WorkspaceContextPort } from '../ports/WorkspaceContextPort'
 import { SubmitPromptUseCase } from './SubmitPromptUseCase'
-import { AssistantProfile } from '../../domain/assistant/entities/AssistantProfile'
-import { WorkspaceContext } from '../../domain/workspace/entities/WorkspaceContext'
-import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 
 function createMockLogger(): LoggerPort {
   return {
@@ -49,6 +50,15 @@ function createMockWorkspace(): WorkspaceContextPort {
 }
 
 function createMockConfig(): CliConfigPort {
+  const promptSet: AssistantPromptSet = {
+    core: 'core prompt',
+    modes: {
+      chat: 'chat prompt',
+      agent: 'agent prompt',
+      plan: 'plan prompt',
+    },
+  }
+
   return {
     getAssistantProfile: () =>
       new AssistantProfile({
@@ -59,6 +69,7 @@ function createMockConfig(): CliConfigPort {
         description: 'test',
         defaultMode: 'agent',
       }),
+    getAssistantPromptSet: () => promptSet,
     getModelConfig: () =>
       ({
         provider: 'openai-compatible',
@@ -90,7 +101,9 @@ function createMockSessionRepo(): SessionRepositoryPort & { sessions: Map<string
   const sessions = new Map<string, ConversationSession>()
   return {
     sessions,
-    save: async (session) => { sessions.set(session.id, session.clone()) },
+    save: async (session) => {
+      sessions.set(session.id, session.clone())
+    },
     findById: async (id) => sessions.get(id)?.clone() ?? null,
   }
 }
@@ -115,6 +128,7 @@ describe('SubmitPromptUseCase', () => {
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:01:00Z')),
       createMockLogger(),
+      createAppI18n('zh-CN'),
     )
 
     const result = await useCase.execute({ sessionId: 'sess-1', prompt: '你好' })
@@ -140,11 +154,12 @@ describe('SubmitPromptUseCase', () => {
     const useCase = new SubmitPromptUseCase(
       repo,
       createMockWorkspace(),
-      createMockResponder('不应被调用'),
+      createMockResponder('不会被调用'),
       createMockConfig(),
       createMockIdGenerator(),
       createMockClock(new Date()),
       createMockLogger(),
+      createAppI18n('zh-CN'),
     )
 
     const result = await useCase.execute({ sessionId: 'sess-2', prompt: '   ' })
@@ -164,6 +179,7 @@ describe('SubmitPromptUseCase', () => {
       createMockIdGenerator(),
       createMockClock(new Date()),
       createMockLogger(),
+      createAppI18n('zh-CN'),
     )
 
     expect(useCase.execute({ sessionId: 'not-exist', prompt: 'hello' })).rejects.toThrow(
@@ -190,6 +206,7 @@ describe('SubmitPromptUseCase', () => {
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:01:00Z')),
       createMockLogger(),
+      createAppI18n('zh-CN'),
     )
 
     const chunks: string[] = []
@@ -199,7 +216,9 @@ describe('SubmitPromptUseCase', () => {
       { sessionId: 'sess-3', prompt: '测试流式' },
       {
         onChunk: (delta) => chunks.push(delta),
-        onDone: (full) => { doneContent = full },
+        onDone: (full) => {
+          doneContent = full
+        },
         onError: () => {},
       },
     )
@@ -237,6 +256,7 @@ describe('SubmitPromptUseCase', () => {
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:01:00Z')),
       createMockLogger(),
+      createAppI18n('zh-CN'),
     )
 
     let errorMsg = ''
@@ -246,7 +266,9 @@ describe('SubmitPromptUseCase', () => {
       {
         onChunk: () => {},
         onDone: () => {},
-        onError: (err) => { errorMsg = err.message },
+        onError: (err) => {
+          errorMsg = err.message
+        },
       },
     )
 

@@ -1,269 +1,359 @@
 # Adnify-Cli
 
-`Adnify-Cli` 是一个面向终端场景的 AI 编程助手脚手架，目标是在 `CLI + Ink + Bun + TypeScript` 的基础上，逐步融合 `cc` 项目的 CLI 编排能力与 `adnify` 项目的 Agent 领域拆分经验，沉淀出一个适合长期演进的 DDD 架构。
+> **Command AI Into Real Work.**
+> 一个兼具品牌感、执行力与工程纪律的下一代 AI 编程终端。
 
-- 项目名：`Adnify-Cli`
-- 作者：`adnaan`
-- 包管理：`bun`
-- 终端 UI：[`ink`](https://github.com/vadimdemedes/ink)
-- 当前阶段：`初步项目搭建 / 架构起盘`
+`Adnify-Cli` 不是把聊天框塞进命令行，也不是“能跑就行”的 AI 工具壳。  
+它是一台真正面向开发工作的智能终端: 既能保持终端体验该有的速度、直接与掌控感，也能承接 AI 编程助手该有的上下文理解、模式切换、命令系统、工具扩展与长期演进能力。
 
-## 1. 项目目标
+如果你想要的不是“会回复”，而是“会推进任务、会保持秩序、会随着项目一起成长”，那 `Adnify-Cli` 就是为这种体验准备的。
 
-这个项目不做“把两个项目硬拼起来”的临时工程，而是做一个可持续演进的 CLI AI 编程助手内核。初版重点不是把所有功能一次性搬完，而是先把以下基础打牢：
+---
 
-1. 明确边界上下文，避免会话、工具、配置、工作区、模型调用相互缠绕。
-2. 使用 DDD 分层，把“业务规则”和“技术实现”拆开。
-3. 用 Bun 保持启动速度和开发效率，用 Ink 做终端交互层。
-4. 保持低耦合、高内聚，方便后续接入真实模型、工具系统、权限系统、会话持久化和插件机制。
+## 产品简介
 
-## 2. 参考项目融合策略
+`Adnify-Cli` 想做的，不是一个普通 CLI，而是一套真正能进入开发者工作流的 AI 编程工作台。
 
-### 来自 `cc` 的借鉴方向
+它强调三件事:
 
-`E:\26Project\Adnify-Cli\cc`
+- **产品感**
+  终端不该只是冰冷的文本堆叠。它也可以有节奏、有布局、有识别度，有一种打开之后就想继续用下去的气质。
 
-- CLI 入口与启动路径拆分
-- 工具编排与权限边界意识
-- 会话主循环与终端交互组织方式
-- 面向终端的交互体验设计
+- **执行力**
+  AI 不应该只负责解释、总结和“给建议”。它应该能够围绕真实任务推进结果，承接命令、模式、上下文和后续工具能力。
 
-### 来自 `adnify` 的借鉴方向
+- **可成长**
+  一个好的 AI CLI 不该越做越乱。它需要从第一天起就有清晰边界，能自然承接持久化、工具系统、权限审批、记忆、插件、多 Agent 等能力。
 
-`E:\Project\adnify`
+一句话概括:
 
-- `ModeRegistry` 这类模式注册思想
-- `ContextAssembler` 这类上下文聚合思路
-- `ToolManager` 这类提供者管理方式
-- 领域职责拆分与服务解耦方向
+**Adnify-Cli 不是终端里的聊天机器人，而是一台真正面向工程交付的 AI 编程终端。**
 
-### 当前实现策略
+---
 
-初版不会直接复制两个项目的目录，而是抽出更适合 CLI 的统一架构：
+## 核心特性
 
-- `Session` 负责会话聚合与消息生命周期
-- `Assistant` 负责助手画像、模式与未来的推理策略
-- `Tooling` 负责工具目录与未来的工具编排
-- `Workspace` 负责工作区洞察与上下文来源
-- `Application` 负责用例编排
-- `Infrastructure` 负责文件系统、日志、ID、时钟、模型网关等适配器
-- `Presentation` 负责 Ink 界面与输入控制
+### 1. 终端产品体验
 
-## 3. 架构原则
+- 更讲究布局与信息密度，不靠把所有状态塞满屏幕来制造“高级感”
+- 让命令、会话、响应、配置和工作状态有清晰层次
+- 追求耐看、耐用、耐长时间协作的终端观感
 
-### 3.1 设计原则
+### 2. AI Agent 深度集成
 
-- 高性能：优先轻量依赖、快速启动、少做无意义抽象。
-- 低耦合：领域对象不依赖 Ink、不依赖 Node API、不依赖具体模型 SDK。
-- 高内聚：每个目录只解决一类问题，避免“万能 utils”和“超级 service”。
-- 高复用：通过端口与适配器隔离基础设施，便于替换模型、存储、工具执行器。
-- 无冗余：只放当前阶段真正有价值的抽象，不堆空接口和死代码。
+- 支持 `chat / agent / plan` 三种核心工作模式
+- 让对话、执行、规划三类任务有清晰分工
+- 后续可自然承接工具调用、权限审批与复杂任务分步执行
 
-### 3.2 DDD 分层
+### 3. 命令与自然语言双通道
 
-| 层 | 作用 | 当前内容 |
-| --- | --- | --- |
-| `domain` | 核心业务规则与聚合 | 会话、消息、模式、工具、工作区 |
-| `application` | 编排业务用例 | 启动、建会话、提交消息、本地命令 |
-| `infrastructure` | 技术细节适配 | 本地工作区探测、日志、内存仓储、ID、时钟、AI 桩实现 |
-| `presentation` | CLI 表现层 | Ink 界面、输入处理、状态桥接 |
+- 可以像传统 CLI 一样输入本地命令
+- 也可以像 AI 助手一样直接描述任务
+- 不强迫用户在“命令行工具”和“聊天窗口”之间来回切换
 
-## 4. 边界上下文规划
+### 4. Prompt Pack 驱动
 
-### 4.1 Session 上下文
+- 系统提示词
+- 模式提示词
+- 工具定义
+- 本地命令说明
 
-职责：
+以上内容统一由 `prompts/` 下的 Markdown 文件驱动，不再把大段 prompt 硬编码在业务代码中。
 
-- 管理消息流
-- 管理当前模式
-- 维护会话标题、时间戳、工作区归属
-- 作为 CLI 交互的核心聚合根
+### 5. 多模型接入能力
 
-后续可扩展：
+当前已支持:
 
-- 会话持久化
-- 分支会话
-- 检查点与回滚
-- 多轮上下文压缩
+- `openai-compatible`
+- `openai-responses`
+- `anthropic`
+- `google`
 
-### 4.2 Assistant 上下文
+并可通过本地配置与命令切换运行时模型。
 
-职责：
+### 6. 国际化基础设施
 
-- 管理助手身份信息
-- 管理模式定义（`chat` / `agent` / `plan`）
-- 承载后续不同推理策略入口
+当前已支持:
 
-后续可扩展：
+- `zh-CN`
+- `en`
 
-- 多模型策略
-- 模式级 Prompt Profile
-- Token Budget 策略
+并且国际化并不只覆盖少量 UI 标签，而是已经开始向界面文案、命令输出、配置流程和运行时提示统一推进。
 
-### 4.3 Tooling 上下文
+---
 
-职责：
+## 独特优势
 
-- 维护工具目录
-- 统一展示工具能力
-- 为后续工具执行编排预留稳定模型
+### 真正适合长期演进
 
-后续可扩展：
+很多 AI CLI 一开始看起来很快能跑，但做一段时间后往往会出现这些问题:
 
-- 工具提供者注册
-- 权限审批
-- Shell / File / Search / Web / MCP / Git 工具
+- UI 文案分散在各处，越改越乱
+- 会话、配置、命令、模型调用互相缠绕
+- 想加一个功能，结果要改一大片
+- 表面是产品，内部却只是临时拼装
 
-### 4.4 Workspace 上下文
+`Adnify-Cli` 从一开始就避免走这条路。
 
-职责：
+它更在意:
 
-- 探测当前工作区状态
-- 提供 Git、包管理器、顶层目录等摘要
-- 为后续上下文组装与工具执行提供基础环境信息
+- 是否有稳定的边界
+- 是否能承接真正的工具系统
+- 是否能让后续能力自然长出来
+- 是否能在持续迭代后依然保持清晰
 
-后续可扩展：
+### 真正像一个“工作台”
 
-- 文件索引
-- 代码摘要
-- 检索增强
-- 忽略规则与目录权限
+`Adnify-Cli` 想解决的不是“AI 能不能回答问题”，而是:
 
-## 5. 当前目录结构
+- 能不能让人更快进入工作状态
+- 能不能把终端从输入框升级成任务界面
+- 能不能让 AI 编程协作变得有秩序，而不是越来越吵
+
+### 真正有品牌识别度
+
+不是千篇一律的通用 AI 工具壳，也不是只有技术没有气质的命令行项目。  
+`Adnify-Cli` 追求的是一种明确的产品角色:
+
+- 冷静
+- 直接
+- 有执行力
+- 有审美控制
+- 有工程底线
+
+---
+
+## 适合谁
+
+- 想做一个真正有产品气质的 AI CLI
+- 想做一个能长期演进的编程助手内核
+- 想兼顾界面体验、工程质量和后续扩展性
+- 想让终端里的 AI 协作不再停留在“对话演示”层面
+
+---
+
+## 当前已落地能力
+
+- Bun + TypeScript + Ink 基础工程
+- 清晰的 `domain / application / infrastructure / presentation` 分层
+- 会话聚合根与消息流模型
+- 本地命令系统
+- 命令建议与命令面板基础能力
+- 流式响应链路
+- 模型配置向导
+- 多 Provider 模型接入
+- Markdown Prompt Pack
+- 中英文国际化基础设施
+
+---
+
+## 当前真实存储设计
+
+这部分不是概念图，而是当前代码里已经真实落地的存储方式。
+
+### 会话存储
+
+当前会话仓储实现:
+
+- [InMemorySessionRepository.ts](/E:/26Project/Adnify-Cli/src/infrastructure/persistence/InMemorySessionRepository.ts)
+
+当前特点:
+
+- 使用内存 `Map` 存储 `ConversationSessionSnapshot`
+- 只在当前进程生命周期内有效
+- 关闭 CLI 后不会保留历史会话
+
+这意味着当前已经具备稳定的仓储边界，但还没有接入文件、SQLite 或远程持久化实现。
+
+### 配置存储
+
+当前模型配置读写位于:
+
+- [loadLocalConfig.ts](/E:/26Project/Adnify-Cli/src/infrastructure/config/loadLocalConfig.ts)
+- [writeLocalConfig.ts](/E:/26Project/Adnify-Cli/src/infrastructure/config/writeLocalConfig.ts)
+
+实际文件位置:
+
+- `~/.adnify-cli/config.json`
+
+当前读取优先级:
+
+1. 环境变量
+2. `~/.adnify-cli/config.json`
+3. 默认值
+
+当前主要环境变量:
+
+- `ADNIFY_PROVIDER`
+- `ADNIFY_API_KEY`
+- `ADNIFY_BASE_URL`
+- `ADNIFY_MODEL`
+- `ADNIFY_LOCALE`
+
+### Prompt / 工具 / 命令定义存储
+
+当前这些定义统一放在 Markdown Prompt Pack 中:
+
+- [prompts/assistant/profile.md](/E:/26Project/Adnify-Cli/prompts/assistant/profile.md)
+- [prompts/system/core.md](/E:/26Project/Adnify-Cli/prompts/system/core.md)
+- [prompts/system/modes/chat.md](/E:/26Project/Adnify-Cli/prompts/system/modes/chat.md)
+- [prompts/system/modes/agent.md](/E:/26Project/Adnify-Cli/prompts/system/modes/agent.md)
+- [prompts/system/modes/plan.md](/E:/26Project/Adnify-Cli/prompts/system/modes/plan.md)
+- [prompts/tools/](/E:/26Project/Adnify-Cli/prompts/tools)
+- [prompts/commands/local-commands.md](/E:/26Project/Adnify-Cli/prompts/commands/local-commands.md)
+
+加载入口:
+
+- [loadPromptBundle.ts](/E:/26Project/Adnify-Cli/src/infrastructure/prompt/loadPromptBundle.ts)
+
+---
+
+## 快速开始
+
+安装依赖:
+
+```bash
+bun install
+```
+
+开发运行:
+
+```bash
+bun run dev
+```
+
+构建:
+
+```bash
+bun run build
+```
+
+测试:
+
+```bash
+bun test
+```
+
+类型检查:
+
+```bash
+bunx tsc --noEmit
+```
+
+---
+
+## 配置示例
+
+`~/.adnify-cli/config.json`
+
+```json
+{
+  "model": {
+    "provider": "openai-compatible",
+    "apiKey": "your-api-key",
+    "baseUrl": "https://api.openai.com/v1",
+    "model": "gpt-5",
+    "maxTokens": 4096,
+    "temperature": 0.7,
+    "timeoutMs": 60000
+  },
+  "providers": {
+    "openai": {
+      "provider": "openai-compatible",
+      "apiKey": "your-api-key",
+      "baseUrl": "https://api.openai.com/v1",
+      "models": ["gpt-5", "gpt-4o"]
+    },
+    "deepseek": {
+      "provider": "openai-compatible",
+      "apiKey": "your-api-key",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "models": ["deepseek-chat", "deepseek-reasoner"]
+    }
+  }
+}
+```
+
+---
+
+## 本地命令
+
+- `:help`
+- `:mode chat`
+- `:mode agent`
+- `:mode plan`
+- `:workspace`
+- `:tools`
+- `:model [provider] [model]`
+- `:config`
+- `:config init`
+- `:clear`
+- `:exit`
+
+---
+
+## 架构概览
+
+### 分层结构
+
+| 层级 | 职责 |
+| --- | --- |
+| `src/domain` | 核心领域模型与聚合根 |
+| `src/application` | 用例编排、端口、DTO、国际化与应用支持逻辑 |
+| `src/infrastructure` | 配置、模型网关、日志、工作区探测、存储实现 |
+| `src/presentation` | Ink UI、输入处理、CLI 状态桥接 |
+
+### 关键上下文
+
+- `assistant`
+- `session`
+- `tooling`
+- `workspace`
+
+---
+
+## 目录结构
 
 ```text
 Adnify-Cli/
-├─ cc/                                # 参考项目快照，仅用于研究与对照
+├─ .rules/
+├─ prompts/
 ├─ src/
 │  ├─ application/
-│  │  ├─ dto/
-│  │  ├─ ports/
-│  │  └─ use-cases/
 │  ├─ domain/
-│  │  ├─ assistant/
-│  │  ├─ session/
-│  │  ├─ tooling/
-│  │  └─ workspace/
 │  ├─ infrastructure/
-│  │  ├─ bootstrap/
-│  │  ├─ config/
-│  │  ├─ llm/
-│  │  ├─ logging/
-│  │  ├─ persistence/
-│  │  ├─ system/
-│  │  └─ workspace/
 │  ├─ presentation/
-│  │  └─ ink/
 │  └─ main.tsx
 ├─ package.json
 ├─ tsconfig.json
 └─ README.md
 ```
 
-## 6. 当前已搭建的内容
+---
 
-1. Bun + TypeScript + Ink 基础工程配置。
-2. DDD 目录骨架与端口/适配器模式。
-3. 会话聚合根与消息实体。
-4. 应用层用例：
-   `BootstrapCliUseCase`
-   `CreateSessionUseCase`
-   `SubmitPromptUseCase`（同步 + 流式）
-   `ApplyCliCommandUseCase`
-5. 基础设施适配器：
-   内存仓储、控制台日志、系统时钟、UUID 生成器、本地工作区探测器、AI 响应桩。
-6. **真实 AI 接入（Vercel AI SDK）**：
-   支持 `openai-compatible`（OpenAI / DeepSeek / Ollama 等）、`openai-responses`（OpenAI Responses API）、`anthropic`、`google` 四种 provider。
-   流式输出、错误恢复、超时控制、中断时保存部分内容。
-7. **配置系统**：
-   `~/.adnify-cli/config.json` + 环境变量（`ADNIFY_API_KEY`, `ADNIFY_BASE_URL`, `ADNIFY_MODEL`, `ADNIFY_PROVIDER`）。
-   多 provider 配置，运行时通过 `:model` 命令热切换。
-8. 可运行的 Ink 界面：
-   标题区、流式消息区、输入区、底部状态栏。
-9. 本地命令：
-   `:help` `:mode chat|agent|plan` `:workspace` `:tools` `:model [provider] [model]` `:config` `:clear` `:exit`
+## 路线图
 
-## 7. 运行方式
+### 下一阶段
 
-安装依赖后可使用：
+- 工具注册中心
+- 文件 / 搜索 / Shell / Git 工具协议
+- 权限审批层
+- 会话持久化
+- 工作区记忆
+- 更完整的品牌化终端体验
 
-```bash
-bun install
-bun run dev
-```
-
-构建：
-
-```bash
-bun run build
-```
-
-运行测试：
-
-```bash
-bun test
-```
-
-## 8. 迭代路线图
-
-### Phase 1：架构起盘
-
-- 完成项目目录
-- 完成领域模型
-- 完成 CLI 初版
-- 完成基础 README
-
-### Phase 2：真实 AI 接入 ✅
-
-- ~~抽象 `ModelGateway`~~ → `ModelGatewayPort` + `AiSdkGateway`
-- ~~接入 OpenAI / Anthropic / OpenAI-Compatible~~ → Vercel AI SDK 四种 provider
-- ~~增加流式输出~~ → `streamReply` + `executeStreaming`
-- ~~增加错误恢复与超时控制~~ → AbortController 超时 + 部分内容保存
-
-### Phase 3：工具系统
-
-- 设计工具注册中心
-- 接入文件读写、搜索、Shell、Git
-- 引入权限审批层
-- 引入工具执行日志
-
-### Phase 4：上下文系统
-
-- 工作区摘要
-- 文件片段注入
-- 代码索引
-- 记忆与规则
-
-### Phase 5：高级能力
+### 中长期
 
 - 多 Agent
-- Plan 模式
 - 插件系统
-- 会话持久化
 - MCP 集成
+- 更强的上下文压缩与检索增强
 
-## 9. 架构约束
+---
 
-为了避免后面失控，项目从一开始就约束以下事项：
+## 开发规范
 
-- `domain` 内禁止出现 Ink、Node 文件系统、终端 IO 依赖。
-- `presentation` 不直接编排复杂业务，只调用用例。
-- `infrastructure` 不承载业务规则，只负责技术实现。
-- `use-case` 可以依赖端口，但不能反向依赖具体适配器。
-- 所有新增模块优先考虑“能否成为独立边界上下文”。
-
-## 10. 下一步建议
-
-Phase 1 和 Phase 2 已完成，下一步最值得继续做的是：
-
-1. 建立工具注册中心，把文件读写、命令执行、搜索能力纳入统一协议（Phase 3）。
-2. 接入 function calling，让模型能调用工具。
-3. 接入会话持久化与工作区记忆（Phase 4）。
-4. 引入权限审批层，控制危险操作。
-
-## 11. 开发规范
-
-为了让 `vibecoding` 保持高效率但不失控，仓库增加了 `.rules` 规范目录：
+仓库内置了 `.rules/`，用于约束 `vibecoding` 过程中的结构质量与协作方式:
 
 - [Rules Index](.rules/README.md)
 - [Core Rules](.rules/00-core.md)
@@ -272,8 +362,14 @@ Phase 1 和 Phase 2 已完成，下一步最值得继续做的是：
 - [Delivery Workflow Rules](.rules/30-delivery-workflow.md)
 - [AI Collaboration Rules](.rules/40-ai-collaboration.md)
 
-后续所有新增功能、重构、AI 生成代码和工具接入，都应以 `.rules` 中的约束为准。
+---
 
-## 12. 说明
+## 项目信息
 
-当前仓库中的 `cc` 目录保留为参考资料；`E:\Project\adnify` 作为外部参考工程，不会直接写入本仓库。当前脚手架的目标是先把 `Adnify-Cli` 自身的架构地基打稳，后续再逐步把可复用能力迁移进来。
+- 项目名: `Adnify-Cli`
+- 作者: `adnaan`
+- 包管理: `bun`
+- 终端 UI: [Ink](https://github.com/vadimdemedes/ink)
+
+`Adnify-Cli` 当前最有价值的地方，不是“已经做完了多少功能”，而是它已经具备了一个优秀产品应有的方向感。  
+接下来要做的，是继续把这份方向感打磨成真正让人上瘾的终端体验。

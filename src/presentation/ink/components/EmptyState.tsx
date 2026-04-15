@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
 import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
 import { adnifyTheme } from '../theme'
@@ -17,6 +18,7 @@ export interface EmptyStateProps {
   modelLabel: string
   busy?: boolean
   commands: string[]
+  i18n: AppI18n
 }
 
 function ModeBadge(props: { mode: AssistantMode; busy?: boolean }) {
@@ -58,7 +60,9 @@ function QuickCommandItem(props: { command: string }) {
 }
 
 export function EmptyState(props: EmptyStateProps) {
-  const gitLabel = props.isGitRepository ? 'tracked' : 'detached'
+  const gitLabel = props.i18n.t(
+    props.isGitRepository ? 'header.meta.gitTracked' : 'header.meta.gitDetached',
+  )
   const gitColor = props.isGitRepository ? adnifyTheme.success : adnifyTheme.warm
 
   return (
@@ -70,29 +74,28 @@ export function EmptyState(props: EmptyStateProps) {
             author={props.author}
             tagline={props.tagline}
             busy={props.busy}
+            i18n={props.i18n}
           />
 
           <Box flexDirection="column" marginTop={1}>
             <Text color={adnifyTheme.textMuted}>{props.description}</Text>
-            <Text color={adnifyTheme.textDim}>
-              Start with a goal, a file, or `/` for the command panel.
-            </Text>
+            <Text color={adnifyTheme.textDim}>{props.i18n.t('empty.hint')}</Text>
           </Box>
 
           <Box gap={1} marginTop={1}>
-            <MetaPill label="workspace " value={props.workspaceName} />
+            <MetaPill label={props.i18n.t('header.meta.workspace')} value={props.workspaceName} />
             <MetaPill
-              label="pkg "
+              label={props.i18n.t('header.meta.package')}
               value={props.packageManager}
               color={adnifyTheme.brandSoft}
             />
-            <MetaPill label="git " value={gitLabel} color={gitColor} />
+            <MetaPill label={props.i18n.t('header.meta.git')} value={gitLabel} color={gitColor} />
           </Box>
         </Box>
 
         <Box width={34} flexDirection="column" flexShrink={0}>
           <Box alignItems="center" justifyContent="space-between">
-            <Text color={adnifyTheme.textDim}>session</Text>
+            <Text color={adnifyTheme.textDim}>{props.i18n.t('empty.panelSession')}</Text>
             <ModeBadge mode={props.mode} busy={props.busy} />
           </Box>
 
@@ -103,7 +106,7 @@ export function EmptyState(props: EmptyStateProps) {
             borderColor={adnifyTheme.borderMuted}
             paddingX={1}
           >
-            <Text color={adnifyTheme.brandSoft}>Quick start</Text>
+            <Text color={adnifyTheme.brandSoft}>{props.i18n.t('empty.panelQuickStart')}</Text>
             <Text color={adnifyTheme.textDim} wrap="truncate-end">
               {props.modelLabel}
             </Text>

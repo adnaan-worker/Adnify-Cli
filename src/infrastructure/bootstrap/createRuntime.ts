@@ -1,33 +1,38 @@
 import type { AdnifyCliRuntime } from '../../application/dto/AdnifyCliRuntime'
+import {
+  createAppI18n,
+  resolveAppLocaleFromEnv,
+} from '../../application/i18n/AppI18n'
 import type { LoggerPort } from '../../application/ports/LoggerPort'
 import { ApplyCliCommandUseCase } from '../../application/use-cases/ApplyCliCommandUseCase'
 import { BootstrapCliUseCase } from '../../application/use-cases/BootstrapCliUseCase'
 import { CreateSessionUseCase } from '../../application/use-cases/CreateSessionUseCase'
 import { SubmitPromptUseCase } from '../../application/use-cases/SubmitPromptUseCase'
+import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import { DefaultCliConfigAdapter } from '../config/DefaultCliConfigAdapter'
 import { AiSdkGateway } from '../llm/AiSdkGateway'
 import { ModelAssistantResponder } from '../llm/ModelAssistantResponder'
 import { StubAssistantResponder } from '../llm/StubAssistantResponder'
 import { ConsoleLogger } from '../logging/ConsoleLogger'
 import { InMemorySessionRepository } from '../persistence/InMemorySessionRepository'
+import { loadPromptBundle } from '../prompt/loadPromptBundle'
 import { CryptoIdGenerator } from '../system/CryptoIdGenerator'
 import { SystemClock } from '../system/SystemClock'
-import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import { LocalWorkspaceContextService } from '../workspace/LocalWorkspaceContextService'
 
 export type { AdnifyCliRuntime }
 
-/**
- * 统一装配运行时依赖。
- * 使用 Vercel AI SDK 支持 OpenAI / Anthropic / Google / OpenAI-compatible。
- */
 export async function createRuntime(): Promise<AdnifyCliRuntime> {
   const logger = new ConsoleLogger()
+  const i18n = createAppI18n(resolveAppLocaleFromEnv())
   const config = new DefaultCliConfigAdapter()
   const sessionRepository = new InMemorySessionRepository()
   const idGenerator = new CryptoIdGenerator()
   const clock = new SystemClock()
   const workspaceContextService = new LocalWorkspaceContextService()
+
+  const promptBundle = await loadPromptBundle()
+  config.setPromptBundle(promptBundle)
 
   const { loadModelConfig, loadProviders } = await import('../config/loadLocalConfig')
   const modelConfig = await loadModelConfig()
@@ -35,7 +40,7 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
   config.setModelConfig(modelConfig)
   config.setProviders(providers)
 
-  const { responder, gateway } = createResponderStack(modelConfig, logger)
+  const { responder, gateway } = createResponderStack(modelConfig, config, logger, i18n)
 
   const submitPrompt = new SubmitPromptUseCase(
     sessionRepository,
@@ -45,40 +50,61 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
     idGenerator,
     clock,
     logger,
+    i18n,
   )
 
   const switchModel = (providerName: string, modelName?: string): ModelConfig | null => {
     const newConfig = config.switchModel(providerName, modelName)
-    if (!newConfig) return null
+    if (!newConfig) {
+      return null
+    }
 
     if (gateway && responder instanceof ModelAssistantResponder) {
       gateway.updateConfig(newConfig)
       responder.updateGateway(gateway, newConfig)
-      logger.info('Model switched via AI SDK', { model: newConfig.model, provider: newConfig.provider })
+      logger.info('Model switched via AI SDK', {
+        model: newConfig.model,
+        provider: newConfig.provider,
+      })
     } else {
-      const newStack = createResponderStack(newConfig, logger)
+      const newStack = createResponderStack(newConfig, config, logger, i18n)
       submitPrompt.updateResponder(newStack.responder)
-      logger.info('Model switched (new responder)', { model: newConfig.model, provider: newConfig.provider })
+      logger.info('Model switched (new responder)', {
+        model: newConfig.model,
+        provider: newConfig.provider,
+      })
     }
 
     return newConfig
   }
 
   return {
+    i18n,
     useCases: {
-      bootstrapCli: new BootstrapCliUseCase(workspaceContextService, config, logger),
-      createSession: new CreateSessionUseCase(sessionRepository, idGenerator, clock, logger),
+      bootstrapCli: new BootstrapCliUseCase(workspaceContextService, config, logger, i18n),
+      createSession: new CreateSessionUseCase(sessionRepository, idGenerator, clock, logger, i18n),
       submitPrompt,
-      applyCliCommand: new ApplyCliCommandUseCase(sessionRepository, idGenerator, clock, logger),
+      applyCliCommand: new ApplyCliCommandUseCase(
+        sessionRepository,
+        idGenerator,
+        clock,
+        logger,
+        i18n,
+      ),
     },
     switchModel,
   }
 }
 
-function createResponderStack(modelConfig: ModelConfig, logger: LoggerPort) {
+function createResponderStack(
+  modelConfig: ModelConfig,
+  config: DefaultCliConfigAdapter,
+  logger: LoggerPort,
+  i18n: ReturnType<typeof createAppI18n>,
+) {
   if (!modelConfig.apiKey) {
-    logger.info('No API key configured — using stub responder')
-    return { responder: new StubAssistantResponder(logger), gateway: null }
+    logger.info('No API key configured, using stub responder')
+    return { responder: new StubAssistantResponder(logger, i18n), gateway: null }
   }
 
   logger.info('Using AI SDK gateway', {
@@ -88,6 +114,6 @@ function createResponderStack(modelConfig: ModelConfig, logger: LoggerPort) {
   })
 
   const gateway = new AiSdkGateway(modelConfig, logger)
-  const responder = new ModelAssistantResponder(gateway, modelConfig, logger)
+  const responder = new ModelAssistantResponder(gateway, modelConfig, config, logger, i18n)
   return { responder, gateway }
 }

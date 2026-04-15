@@ -1,5 +1,5 @@
-import type { AssistantMode } from '../../domain/assistant/value-objects/AssistantMode'
 import type { AssistantProfile } from '../../domain/assistant/entities/AssistantProfile'
+import type { AssistantMode } from '../../domain/assistant/value-objects/AssistantMode'
 import type { ModelConfig, ProvidersMap } from '../../domain/assistant/value-objects/ModelConfig'
 import type { ToolDescriptor } from '../../domain/tooling/entities/ToolDescriptor'
 import type { WorkspaceContext } from '../../domain/workspace/entities/WorkspaceContext'
@@ -16,6 +16,4 @@ export interface BootstrapSnapshot {
   supportedModes: AssistantMode[]
   toolCatalog: ToolDescriptor[]
   localCommands: string[]
-  welcomeMessage: string
 }
-

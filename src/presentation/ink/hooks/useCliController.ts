@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Key } from 'ink'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BootstrapSnapshot } from '../../../application/dto/BootstrapSnapshot'
 import type { AdnifyCliRuntime } from '../../../application/dto/AdnifyCliRuntime'
 import type { ConversationSession } from '../../../domain/session/aggregates/ConversationSession'
@@ -27,29 +27,30 @@ export interface CliControllerState {
   handleInput: (input: string, key: Key) => void
 }
 
-const COMMAND_DESCRIPTIONS: Record<string, string> = {
-  ':help': '查看本地命令列表',
-  ':mode chat': '切换到对话模式',
-  ':mode agent': '切换到代理执行模式',
-  ':mode plan': '切换到规划模式',
-  ':workspace': '查看当前工作区摘要',
-  ':tools': '查看工具目录规划',
-  ':model [provider] [model]': '查看或切换当前模型',
-  ':config': '查看当前模型配置',
-  ':config init': '启动模型配置向导',
-  ':clear': '清空当前会话消息',
-  ':exit': '退出 Adnify-Cli',
+const COMMAND_DESCRIPTION_KEYS: Record<string, string> = {
+  ':help': 'command.desc.help',
+  ':mode chat': 'command.desc.mode.chat',
+  ':mode agent': 'command.desc.mode.agent',
+  ':mode plan': 'command.desc.mode.plan',
+  ':workspace': 'command.desc.workspace',
+  ':tools': 'command.desc.tools',
+  ':model [provider] [model]': 'command.desc.model',
+  ':config': 'command.desc.config',
+  ':config init': 'command.desc.configInit',
+  ':clear': 'command.desc.clear',
+  ':exit': 'command.desc.exit',
 }
 
 /**
  * Ink 展示层状态桥。
- * 这里只负责把用户输入翻译成用例调用，不直接承载领域规则。
+ * 这里负责把用户输入翻译成用例调用，不直接承载领域规则。
  */
 export function useCliController(params: UseCliControllerParams): CliControllerState {
+  const { i18n } = params.runtime
   const [bootstrap, setBootstrap] = useState<BootstrapSnapshot | null>(null)
   const [session, setSession] = useState<ConversationSession | null>(null)
   const [inputValue, setInputValue] = useState('')
-  const [statusLine, setStatusLine] = useState('正在初始化…')
+  const [statusLine, setStatusLine] = useState(i18n.t('status.initializing'))
   const [streamingText, setStreamingText] = useState('')
   const [isBooting, setIsBooting] = useState(true)
   const [isBusy, setIsBusy] = useState(false)
@@ -57,10 +58,10 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
 
   const busyRef = useRef(false)
   const bootKeyRef = useRef<string | null>(null)
-  const configInit = useConfigInit()
+  const configInit = useConfigInit(i18n)
 
   useEffect(() => {
-    const bootKey = `${params.cwd}`
+    const bootKey = params.cwd
     if (bootKeyRef.current === bootKey) {
       return
     }
@@ -78,7 +79,6 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
         const createdSession = await params.runtime.useCases.createSession.execute({
           workspacePath: bootSnapshot.workspace.rootPath,
           mode: bootSnapshot.profile.defaultMode,
-          welcomeMessage: bootSnapshot.welcomeMessage,
         })
 
         if (!mounted) {
@@ -90,17 +90,17 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
 
         if (!bootSnapshot.modelConfig.apiKey) {
           configInit.start()
-          setStatusLine('尚未检测到模型配置，请先完成初始化。')
+          setStatusLine(i18n.t('status.notConfigured'))
         } else {
-          setStatusLine('运行时已就绪，可以开始交互。')
+          setStatusLine(i18n.t('status.runtimeReady'))
         }
       } catch (error) {
         if (!mounted) {
           return
         }
 
-        const message = error instanceof Error ? error.message : '未知错误'
-        setStatusLine(`启动失败：${message}`)
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        setStatusLine(`${i18n.t('app.boot.failed')}: ${message}`)
       } finally {
         if (mounted) {
           setIsBooting(false)
@@ -113,7 +113,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     return () => {
       mounted = false
     }
-  }, [configInit.start, params.cwd, params.runtime])
+  }, [configInit.start, i18n, params.cwd, params.runtime])
 
   const commandSuggestions = useMemo<CommandSuggestionItem[]>(() => {
     if (!bootstrap) {
@@ -133,10 +133,11 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     return bootstrap.localCommands
       .map((command) => ({
         command,
-        description: COMMAND_DESCRIPTIONS[command] ?? '执行本地命令',
+        description:
+          i18n.maybeT(COMMAND_DESCRIPTION_KEYS[command] ?? '') ?? i18n.t('command.desc.default'),
       }))
       .filter((item) => item.command.toLowerCase().startsWith(keyword))
-  }, [bootstrap, inputValue])
+  }, [bootstrap, i18n, inputValue])
 
   const isSuggestionOpen = commandSuggestions.length > 0 && !configInit.isActive
 
@@ -190,8 +191,8 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
           setStatusLine(result.message)
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : '未知错误'
-        setStatusLine(`配置失败：${message}`)
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        setStatusLine(i18n.t('status.configFailed', { message }))
       } finally {
         busyRef.current = false
         setIsBusy(false)
@@ -212,7 +213,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     try {
       if (nextInput === ':config init') {
         configInit.start()
-        setStatusLine('正在进入模型配置向导…')
+        setStatusLine(i18n.t('status.enteringConfigInit'))
         return
       }
 
@@ -242,7 +243,6 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       }
 
       setStreamingText('')
-      setStatusLine('正在生成响应…')
 
       const result = await params.runtime.useCases.submitPrompt.executeStreaming(
         { sessionId: session.id, prompt: nextInput },
@@ -255,7 +255,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
           },
           onError: (error) => {
             setStreamingText('')
-            setStatusLine(`响应失败：${error.message}`)
+            setStatusLine(i18n.t('status.responseFailed', { message: error.message }))
           },
         },
       )
@@ -263,8 +263,8 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       setSession(result.session)
       setStatusLine(result.statusLine)
     } catch (error) {
-      const message = error instanceof Error ? error.message : '未知错误'
-      setStatusLine(`执行失败：${message}`)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      setStatusLine(i18n.t('status.executionFailed', { message }))
       setStreamingText('')
     } finally {
       busyRef.current = false
@@ -274,6 +274,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     bootstrap,
     commandSuggestions,
     configInit,
+    i18n,
     inputValue,
     isSuggestionOpen,
     params,
@@ -339,7 +340,10 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     isBooting,
     isBusy,
     configInitPrompt: configInit.isActive
-      ? configInit.promptText + (configInit.errorText ? `\n错误：${configInit.errorText}` : '')
+      ? configInit.promptText +
+        (configInit.errorText
+          ? `\n${i18n.t('conversation.configError', { message: configInit.errorText })}`
+          : '')
       : '',
     commandSuggestions,
     selectedSuggestionIndex,
