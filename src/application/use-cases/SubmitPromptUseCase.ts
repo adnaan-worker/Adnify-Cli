@@ -25,7 +25,7 @@ export interface StreamingCallbacks {
 
 /**
  * 提交用户输入并获得助手回复。
- * 支持同步和流式两种路径。流式为 CLI 主路径，同步保留用于测试和简单场景。
+ * 同时支持同步与流式两种路径，其中流式路径是 CLI 的主交互链路。
  */
 export class SubmitPromptUseCase {
   constructor(
@@ -77,8 +77,8 @@ export class SubmitPromptUseCase {
   }
 
   /**
-   * 流式提交。先追加用户消息，然后通过回调逐步输出助手回复。
-   * 回复完成后自动追加到会话并持久化。
+   * 流式提交。
+   * 先记录用户消息，再通过回调逐步输出助手响应，完成后写回会话。
    */
   async executeStreaming(
     command: SubmitPromptCommand,
@@ -136,7 +136,7 @@ export class SubmitPromptUseCase {
         session.addAssistantMessage(
           this.idGenerator.next(),
           this.clock.now(),
-          partial + '\n\n[响应中断]',
+          `${partial}\n\n[响应中断]`,
         )
         await this.sessionRepository.save(session)
       }

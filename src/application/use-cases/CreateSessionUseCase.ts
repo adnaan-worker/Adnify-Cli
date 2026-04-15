@@ -14,7 +14,7 @@ export interface CreateSessionCommand {
 
 /**
  * 创建会话。
- * 这里是会话聚合根的唯一入口，方便后续加入持久化规则和事件。
+ * 启动提示不直接写入会话流，避免和初始化向导、空状态内容重复。
  */
 export class CreateSessionUseCase {
   constructor(
@@ -34,17 +34,13 @@ export class CreateSessionUseCase {
       createdAt: now,
     })
 
-    if (command.welcomeMessage) {
-      session.addAssistantMessage(this.idGenerator.next(), now, command.welcomeMessage)
-    }
-
     await this.sessionRepository.save(session)
     this.logger.info('Created new session', {
       sessionId: session.id,
       mode: session.mode,
+      hasWelcomeMessage: Boolean(command.welcomeMessage),
     })
 
     return session
   }
 }
-

@@ -25,7 +25,7 @@ export interface ApplyCliCommandResult {
 
 /**
  * 处理本地命令。
- * 这类命令不走模型，而是直接在应用层完成，会让 CLI 首屏体验更轻更快。
+ * 这类命令不走模型，而是直接在应用层完成，让 CLI 的本地交互保持快速和确定。
  */
 export class ApplyCliCommandUseCase {
   constructor(
@@ -56,11 +56,9 @@ export class ApplyCliCommandUseCase {
           ].join('\n'),
         )
         await this.sessionRepository.save(session)
-        return {
-          session,
-          statusLine: '已输出本地命令帮助。',
-        }
+        return { session, statusLine: '已输出本地命令帮助。' }
       }
+
       case 'mode': {
         const nextMode = args[0]
         if (!nextMode || !isAssistantMode(nextMode)) {
@@ -70,10 +68,7 @@ export class ApplyCliCommandUseCase {
             `模式无效。可选模式：${ASSISTANT_MODES.join(', ')}`,
           )
           await this.sessionRepository.save(session)
-          return {
-            session,
-            statusLine: '模式切换失败，请检查命令参数。',
-          }
+          return { session, statusLine: '模式切换失败，请检查命令参数。' }
         }
 
         session.switchMode(nextMode, now)
@@ -83,23 +78,15 @@ export class ApplyCliCommandUseCase {
           `会话模式已切换为 ${nextMode}。`,
         )
         await this.sessionRepository.save(session)
-        return {
-          session,
-          statusLine: `当前模式：${nextMode}`,
-        }
+        return { session, statusLine: `当前模式：${nextMode}` }
       }
+
       case 'workspace': {
-        session.addSystemMessage(
-          this.idGenerator.next(),
-          now,
-          command.bootstrap.workspace.toSummaryText(),
-        )
+        session.addSystemMessage(this.idGenerator.next(), now, command.bootstrap.workspace.toSummaryText())
         await this.sessionRepository.save(session)
-        return {
-          session,
-          statusLine: '已输出工作区摘要。',
-        }
+        return { session, statusLine: '已输出工作区摘要。' }
       }
+
       case 'tools': {
         const toolsText = [
           '当前规划的工具目录：',
@@ -110,19 +97,18 @@ export class ApplyCliCommandUseCase {
 
         session.addSystemMessage(this.idGenerator.next(), now, toolsText)
         await this.sessionRepository.save(session)
-        return {
-          session,
-          statusLine: '已输出工具目录。',
-        }
+        return { session, statusLine: '已输出工具目录。' }
       }
+
       case 'model': {
         const mc = command.bootstrap.modelConfig
         const providers = command.bootstrap.providers
 
         if (!args[0]) {
-          const providerList = Object.entries(providers).map(([name, p]) =>
-            `- ${name}: ${p.models.join(', ')} (${p.baseUrl})`,
+          const providerList = Object.entries(providers).map(
+            ([name, provider]) => `- ${name}: ${provider.models.join(', ')} (${provider.baseUrl})`,
           )
+
           session.addSystemMessage(
             this.idGenerator.next(),
             now,
@@ -131,10 +117,10 @@ export class ApplyCliCommandUseCase {
               '',
               providerList.length > 0
                 ? ['可用 Provider：', ...providerList].join('\n')
-                : '未配置其他 Provider。在 ~/.adnify-cli/config.json 的 providers 中添加。',
+                : '尚未配置额外 Provider，可在 ~/.adnify-cli/config.json 的 providers 字段中添加。',
               '',
               '用法：:model <provider> [model]',
-              '示例：:model jucodex gpt-5.1-codex',
+              '示例：:model openai gpt-5',
             ].join('\n'),
           )
           await this.sessionRepository.save(session)
@@ -145,7 +131,7 @@ export class ApplyCliCommandUseCase {
         const modelName = args[1]
 
         if (!command.modelSwitcher) {
-          session.addSystemMessage(this.idGenerator.next(), now, '模型切换功能未就绪。')
+          session.addSystemMessage(this.idGenerator.next(), now, '模型切换能力尚未就绪。')
           await this.sessionRepository.save(session)
           return { session, statusLine: '模型切换失败。' }
         }
@@ -170,11 +156,13 @@ export class ApplyCliCommandUseCase {
         await this.sessionRepository.save(session)
         return { session, statusLine: `当前模型：${result.model}` }
       }
+
       case 'config': {
         const mc = command.bootstrap.modelConfig
         const masked = mc.apiKey
           ? mc.apiKey.slice(0, 6) + '...' + mc.apiKey.slice(-4)
           : '未配置'
+
         const configText = [
           '当前模型配置：',
           `- Provider：${mc.provider}`,
@@ -187,16 +175,14 @@ export class ApplyCliCommandUseCase {
           '',
           '配置方式：',
           '1. 创建 ~/.adnify-cli/config.json',
-          '2. 或设置环境变量：ADNIFY_API_KEY, ADNIFY_BASE_URL, ADNIFY_MODEL, ADNIFY_PROVIDER',
+          '2. 或设置环境变量：ADNIFY_API_KEY、ADNIFY_BASE_URL、ADNIFY_MODEL、ADNIFY_PROVIDER',
         ].join('\n')
 
         session.addSystemMessage(this.idGenerator.next(), now, configText)
         await this.sessionRepository.save(session)
-        return {
-          session,
-          statusLine: '已输出模型配置。',
-        }
+        return { session, statusLine: '已输出模型配置。' }
       }
+
       case 'clear': {
         session.clearConversation(now)
         session.addSystemMessage(
@@ -205,11 +191,9 @@ export class ApplyCliCommandUseCase {
           '会话已清空，但工作区上下文和当前模式仍然保留。',
         )
         await this.sessionRepository.save(session)
-        return {
-          session,
-          statusLine: '会话已清空。',
-        }
+        return { session, statusLine: '会话已清空。' }
       }
+
       case 'exit': {
         this.logger.info('User requested CLI exit', { sessionId: command.sessionId })
         return {
@@ -218,17 +202,15 @@ export class ApplyCliCommandUseCase {
           shouldExit: true,
         }
       }
+
       default: {
         session.addSystemMessage(
           this.idGenerator.next(),
           now,
-          `未知命令：:${verb || '<empty>'}。输入 :help 查看可用命令。`,
+          `未知命令：${verb || '<empty>'}。输入 :help 查看可用命令。`,
         )
         await this.sessionRepository.save(session)
-        return {
-          session,
-          statusLine: '命令无法识别。',
-        }
+        return { session, statusLine: '命令无法识别。' }
       }
     }
   }

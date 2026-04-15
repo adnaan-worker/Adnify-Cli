@@ -2,9 +2,11 @@ import type { LoggerPort } from '../../application/ports/LoggerPort'
 
 /**
  * 控制台日志适配器。
- * 后续可以替换为文件日志、遥测、结构化日志平台。
+ * Ink 交互界面运行时默认静默，避免日志输出破坏终端 UI 的重绘。
  */
 export class ConsoleLogger implements LoggerPort {
+  constructor(private readonly enabled = process.env.ADNIFY_DEBUG === 'true') {}
+
   debug(message: string, context?: Record<string, unknown>): void {
     this.write('DEBUG', message, context)
   }
@@ -22,8 +24,11 @@ export class ConsoleLogger implements LoggerPort {
   }
 
   private write(level: string, message: string, context?: Record<string, unknown>): void {
+    if (!this.enabled) {
+      return
+    }
+
     const contextSuffix = context ? ` ${JSON.stringify(context)}` : ''
     console.error(`[${level}] ${message}${contextSuffix}`)
   }
 }
-

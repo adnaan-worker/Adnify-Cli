@@ -9,7 +9,7 @@ export interface WorkspaceContextProps {
 
 /**
  * 工作区实体。
- * 它只表达“当前工作区是什么样子”，不承担任何 IO 细节。
+ * 它只表达当前工作区的结构信息，不承担任何 IO 细节。
  */
 export class WorkspaceContext {
   constructor(private readonly props: WorkspaceContextProps) {}
