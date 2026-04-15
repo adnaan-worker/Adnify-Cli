@@ -1,4 +1,4 @@
-import { Box, Newline, Text, useApp, useInput } from 'ink'
+import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
 import type { AdnifyCliRuntime } from '../../application/dto/AdnifyCliRuntime'
 import { adnifyTheme } from './theme'
 import { ActivityPulse } from './components/ActivityPulse'
@@ -17,6 +17,7 @@ export interface AppProps {
 
 export function App(props: AppProps) {
   const { exit } = useApp()
+  const { stdout } = useStdout()
   const controller = useCliController({
     runtime: props.runtime,
     cwd: props.cwd,
@@ -26,9 +27,45 @@ export function App(props: AppProps) {
 
   useInput(controller.handleInput)
 
+  const bootstrap = controller.bootstrap
+  const session = controller.session
+  const workspace = bootstrap?.workspace
+  const profile = bootstrap?.profile
+  const modelConfig = bootstrap?.modelConfig
+  const modelLabel = modelConfig ? `${modelConfig.provider} / ${modelConfig.model}` : ''
+  const workspaceName = workspace
+    ? workspace.rootPath.split(/[\\/]/).filter(Boolean).pop() ?? workspace.rootPath
+    : i18n.t('app.boot.workspaceName')
+  const messages = session?.getRecentMessages(24) ?? []
+  const showEmptyState =
+    Boolean(session) &&
+    messages.length === 0 &&
+    !controller.streamingText &&
+    !controller.configInitPrompt
+  const terminalRows = stdout?.rows ?? 30
+  const viewportChromeRows = 4
+  const headerRows = showEmptyState ? 0 : 7
+  const inputRows = controller.isSuggestionOpen ? 12 : controller.isBusy ? 7 : 8
+  const statusRows = controller.isBusy ? 0 : 2
+  const layoutGapRows = showEmptyState ? 1 : 2
+  const safetyRows = 2
+  const conversationViewportRows = Math.max(
+    4,
+    Math.min(
+      12,
+      terminalRows -
+        headerRows -
+        inputRows -
+        statusRows -
+        layoutGapRows -
+        viewportChromeRows -
+        safetyRows,
+    ),
+  )
+
   if (controller.isBooting) {
     return (
-      <Box width="100%" flexDirection="column" paddingX={1} paddingY={1}>
+      <Box width="100%" flexDirection="column" paddingX={1}>
         <HeaderBar
           appName="Adnify-Cli"
           author="adnaan"
@@ -38,6 +75,7 @@ export function App(props: AppProps) {
           mode="agent"
           modelLabel={i18n.t('app.boot.modelLabel')}
           busy
+          animateBrand
           i18n={i18n}
         />
         <Box width="100%" marginTop={1}>
@@ -48,7 +86,12 @@ export function App(props: AppProps) {
           >
             <Box flexDirection="column" marginTop={1}>
               <Box gap={1}>
-                <ActivityPulse active color={adnifyTheme.brandStrong} idleFrame="*" />
+                <ActivityPulse
+                  active
+                  animated
+                  color={adnifyTheme.brandStrong}
+                  idleFrame=".  "
+                />
                 <Text color={adnifyTheme.brand}>{i18n.t('app.boot.heading')}</Text>
               </Box>
               <Text color={adnifyTheme.textMuted}>{i18n.t('app.boot.description')}</Text>
@@ -61,7 +104,7 @@ export function App(props: AppProps) {
 
   if (!controller.bootstrap || !controller.session) {
     return (
-      <Box width="100%" flexDirection="column" paddingX={1} paddingY={1}>
+      <Box width="100%" flexDirection="column" paddingX={1}>
         <Text color={adnifyTheme.danger}>{i18n.t('app.boot.failed')}</Text>
         <Newline />
         <Text color={adnifyTheme.textPrimary}>{controller.statusLine}</Text>
@@ -69,43 +112,42 @@ export function App(props: AppProps) {
     )
   }
 
-  const workspace = controller.bootstrap.workspace
-  const profile = controller.bootstrap.profile
-  const modelConfig = controller.bootstrap.modelConfig
-  const modelLabel = `${modelConfig.provider} / ${modelConfig.model}`
-  const messages = controller.session.getRecentMessages(14)
-  const showEmptyState =
-    messages.length === 0 && !controller.streamingText && !controller.configInitPrompt
+  const readyBootstrap = controller.bootstrap
+  const readySession = controller.session
+  const readyWorkspace = readyBootstrap.workspace
+  const readyProfile = readyBootstrap.profile
+  const readyModelConfig = readyBootstrap.modelConfig
 
   return (
-    <Box width="100%" flexDirection="column" paddingX={1} paddingY={1}>
+    <Box width="100%" flexDirection="column" paddingX={1}>
       {showEmptyState ? (
         <EmptyState
-          assistantName={profile.name}
-          author={profile.author}
+          assistantName={readyProfile.name}
+          author={readyProfile.author}
           tagline={i18n.t('assistant.tagline')}
           description={i18n.t('assistant.description')}
-          workspaceName={workspace.rootPath.split(/[\\/]/).filter(Boolean).pop() ?? workspace.rootPath}
-          packageManager={workspace.packageManager}
-          isGitRepository={workspace.isGitRepository}
-          mode={controller.session.mode}
+          workspaceName={workspaceName}
+          packageManager={readyWorkspace.packageManager}
+          isGitRepository={readyWorkspace.isGitRepository}
+          mode={readySession.mode}
           modelLabel={modelLabel}
           busy={controller.isBusy}
-          commands={controller.bootstrap.localCommands}
+          commands={readyBootstrap.localCommands}
           i18n={i18n}
         />
       ) : (
         <>
           <HeaderBar
-            appName={profile.name}
-            author={profile.author}
+            appName={readyProfile.name}
+            author={readyProfile.author}
             tagline={i18n.t('assistant.tagline')}
-            workspaceName={workspace.rootPath.split(/[\\/]/).filter(Boolean).pop() ?? workspace.rootPath}
-            packageManager={workspace.packageManager}
-            isGitRepository={workspace.isGitRepository}
-            mode={controller.session.mode}
+            workspaceName={workspaceName}
+            packageManager={readyWorkspace.packageManager}
+            isGitRepository={readyWorkspace.isGitRepository}
+            mode={readySession.mode}
             modelLabel={modelLabel}
             busy={controller.isBusy}
+            animateBrand={false}
             i18n={i18n}
           />
 
@@ -114,6 +156,7 @@ export function App(props: AppProps) {
               messages={messages}
               streamingText={controller.streamingText}
               configInitPrompt={controller.configInitPrompt}
+              viewportRows={conversationViewportRows}
               i18n={i18n}
             />
           </Box>
@@ -136,7 +179,7 @@ export function App(props: AppProps) {
       <StatusDock
         statusLine={controller.statusLine}
         isBusy={controller.isBusy}
-        isConfigured={Boolean(modelConfig.apiKey)}
+        isConfigured={Boolean(readyModelConfig.apiKey)}
         i18n={i18n}
       />
     </Box>

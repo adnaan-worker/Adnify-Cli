@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink'
 import type { AppI18n } from '../../../application/i18n/AppI18n'
+import { memo } from 'react'
 import { adnifyTheme } from '../theme'
 
 export interface StatusDockProps {
@@ -9,15 +10,15 @@ export interface StatusDockProps {
   i18n: AppI18n
 }
 
-export function StatusDock(props: StatusDockProps) {
-  if (props.isBusy) {
-    return null
-  }
-
+export const StatusDock = memo(function StatusDock(props: StatusDockProps) {
   const noiseStatusLines = new Set([
     props.i18n.t('status.runtimeReady'),
     props.i18n.t('status.responseCompleted'),
   ])
+
+  if (props.isBusy) {
+    return null
+  }
 
   if (props.isConfigured && noiseStatusLines.has(props.statusLine)) {
     return null
@@ -36,4 +37,4 @@ export function StatusDock(props: StatusDockProps) {
       </Text>
     </Box>
   )
-}
+})

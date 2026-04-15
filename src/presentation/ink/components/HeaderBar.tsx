@@ -2,6 +2,7 @@ import { Box, Text } from 'ink'
 import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
 import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
+import { memo } from 'react'
 import { adnifyTheme } from '../theme'
 import { ActivityPulse } from './ActivityPulse'
 import { Panel } from './Panel'
@@ -17,6 +18,7 @@ export interface HeaderBarProps {
   mode: AssistantMode
   modelLabel: string
   busy?: boolean
+  animateBrand?: boolean
   i18n: AppI18n
 }
 
@@ -49,7 +51,7 @@ function MetaPill(props: { label: string; value: string; color?: string }) {
   )
 }
 
-export function HeaderBar(props: HeaderBarProps) {
+export const HeaderBar = memo(function HeaderBar(props: HeaderBarProps) {
   const gitLabel = props.i18n.t(
     props.isGitRepository ? 'header.meta.gitTracked' : 'header.meta.gitDetached',
   )
@@ -64,11 +66,17 @@ export function HeaderBar(props: HeaderBarProps) {
             author={props.author}
             tagline={props.tagline}
             busy={props.busy}
+            animateMascot={props.animateBrand}
             i18n={props.i18n}
           />
 
           <Box gap={1} marginTop={1}>
-            <ActivityPulse active={props.busy} color={adnifyTheme.brandStrong} idleFrame="*" />
+            <ActivityPulse
+              active={props.busy}
+              animated={props.animateBrand}
+              color={adnifyTheme.brandStrong}
+              idleFrame="·  "
+            />
             <MetaPill label={props.i18n.t('header.meta.workspace')} value={props.workspaceName} />
             {props.packageManager ? (
               <MetaPill
@@ -92,4 +100,4 @@ export function HeaderBar(props: HeaderBarProps) {
       </Box>
     </Panel>
   )
-}
+})

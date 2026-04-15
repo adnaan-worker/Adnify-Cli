@@ -2,6 +2,7 @@ import { Box, Text } from 'ink'
 import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
 import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
+import { memo } from 'react'
 import { adnifyTheme } from '../theme'
 import { Panel } from './Panel'
 import { Wordmark } from './Wordmark'
@@ -59,7 +60,7 @@ function QuickCommandItem(props: { command: string }) {
   )
 }
 
-export function EmptyState(props: EmptyStateProps) {
+export const EmptyState = memo(function EmptyState(props: EmptyStateProps) {
   const gitLabel = props.i18n.t(
     props.isGitRepository ? 'header.meta.gitTracked' : 'header.meta.gitDetached',
   )
@@ -121,4 +122,4 @@ export function EmptyState(props: EmptyStateProps) {
       </Box>
     </Panel>
   )
-}
+})

@@ -1,6 +1,7 @@
 import { Box, Text } from 'ink'
 import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
+import { memo } from 'react'
 import { adnifyTheme } from '../theme'
 import { ActivityPulse } from './ActivityPulse'
 import type { CommandSuggestionItem } from './CommandSuggestionList'
@@ -18,7 +19,7 @@ export interface InputDockProps {
   i18n: AppI18n
 }
 
-export function InputDock(props: InputDockProps) {
+export const InputDock = memo(function InputDock(props: InputDockProps) {
   return (
     <Panel
       title={props.isSuggestionOpen ? props.i18n.t('input.panelCommands') : props.i18n.t('input.panelConsole')}
@@ -28,8 +29,9 @@ export function InputDock(props: InputDockProps) {
         <Box gap={1} alignItems="center">
           <ActivityPulse
             active={props.busy}
+            animated={props.busy}
             color={props.busy ? adnifyTheme.brandStrong : adnifyTheme.textDim}
-            idleFrame="*"
+            idleFrame="·  "
           />
           <Text color={adnifyTheme.textDim}>
             {props.isSuggestionOpen ? '/' : props.i18n.t('input.labelInput')}
@@ -65,4 +67,4 @@ export function InputDock(props: InputDockProps) {
       ) : null}
     </Panel>
   )
-}
+})

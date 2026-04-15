@@ -1,8 +1,8 @@
-import { Box, Text } from 'ink'
+import { Box, Text, useStdout } from 'ink'
 import type { AppI18n } from '../../../application/i18n/AppI18n'
+import { memo, useMemo } from 'react'
 import {
   parseCliTranscriptMarkup,
-  type CliTranscriptPayload,
   type CliTranscriptTone,
 } from '../../../application/support/CliTranscriptMarkup'
 import type { ConversationMessage } from '../../../domain/session/entities/ConversationMessage'
@@ -14,8 +14,35 @@ export interface ConversationViewportProps {
   messages: ConversationMessage[]
   streamingText?: string
   configInitPrompt?: string
+  viewportRows: number
   i18n: AppI18n
 }
+
+interface TextViewportRow {
+  kind: 'text'
+  key: string
+  content: string
+  contentColor: string
+  indent?: number
+  prefix?: string
+  prefixColor?: string
+}
+
+interface SpacerViewportRow {
+  kind: 'spacer'
+  key: string
+}
+
+interface StreamingHeaderViewportRow {
+  kind: 'streaming-header'
+  key: string
+  label: string
+}
+
+type ViewportRow = TextViewportRow | SpacerViewportRow | StreamingHeaderViewportRow
+
+const PANEL_HORIZONTAL_CHROME = 8
+const MIN_CONTENT_WIDTH = 24
 
 function resolveToneColor(tone: CliTranscriptTone): string {
   switch (tone) {
@@ -32,186 +59,331 @@ function resolveToneColor(tone: CliTranscriptTone): string {
   }
 }
 
-function splitContent(content: string): string[] {
-  const lines = content.split('\n')
-  return lines.length > 0 ? lines : ['']
-}
-
-function BodyText(props: { content: string; color: string; indent?: number }) {
-  const lines = splitContent(props.content)
-
-  return (
-    <Box flexDirection="column" marginLeft={props.indent ?? 0}>
-      {lines.map((line, index) => (
-        <Text key={`${index}-${line}`} color={props.color}>
-          {line || ' '}
-        </Text>
-      ))}
-    </Box>
-  )
-}
-
-function PromptMessage(props: { content: string }) {
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Box gap={1}>
-        <Text color={adnifyTheme.user}>{'>'}</Text>
-        <Text color={adnifyTheme.textPrimary}>{props.content}</Text>
-      </Box>
-    </Box>
-  )
-}
-
-function AssistantMessageBlock(props: { content: string; i18n: AppI18n }) {
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Box gap={1}>
-        <Text color={adnifyTheme.brand}>adnify</Text>
-        <Text color={adnifyTheme.textDim}>{props.i18n.t('conversation.response')}</Text>
-      </Box>
-      <BodyText content={props.content} color={adnifyTheme.textPrimary} indent={2} />
-    </Box>
-  )
-}
-
-function SystemNotice(props: { content: string; i18n: AppI18n }) {
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Box gap={1}>
-        <Text color={adnifyTheme.textDim}>*</Text>
-        <Text color={adnifyTheme.textSecondary}>{props.i18n.t('conversation.notice')}</Text>
-      </Box>
-      <BodyText content={props.content} color={adnifyTheme.textMuted} indent={2} />
-    </Box>
-  )
-}
-
-function CommandInputRow(props: { content: string }) {
-  return (
-    <Box marginTop={1} gap={1}>
-      <Text color={adnifyTheme.brandStrong}>/</Text>
-      <Text color={adnifyTheme.brandSoft}>{props.content.replace(/^\//, '')}</Text>
-    </Box>
-  )
-}
-
-function CommandOutputBlock(props: {
-  content: string
-  title?: string
-  tone: CliTranscriptTone
-  i18n: AppI18n
-}) {
-  const accentColor = resolveToneColor(props.tone)
-
-  return (
-    <Box marginTop={1}>
-      <Text color={accentColor}>{'|'}</Text>
-      <Box flexDirection="column" marginLeft={1}>
-        <Box gap={1}>
-          <Text color={accentColor}>{props.title ?? props.i18n.t('conversation.output')}</Text>
-          <Text color={adnifyTheme.textDim}>{props.i18n.t('conversation.localCommand')}</Text>
-        </Box>
-        <BodyText content={props.content} color={adnifyTheme.textSecondary} />
-      </Box>
-    </Box>
-  )
-}
-
-function NoticeBlock(props: {
-  content: string
-  title?: string
-  tone: CliTranscriptTone
-  i18n: AppI18n
-}) {
-  const accentColor = resolveToneColor(props.tone)
-
-  return (
-    <Box marginTop={1}>
-      <Text color={accentColor}>{'~'}</Text>
-      <Box flexDirection="column" marginLeft={1}>
-        <Text color={accentColor}>{props.title ?? props.i18n.t('conversation.notice')}</Text>
-        <BodyText content={props.content} color={adnifyTheme.textMuted} />
-      </Box>
-    </Box>
-  )
-}
-
-function renderStructuredMessage(
-  markup: CliTranscriptPayload,
-  fallbackMessage: ConversationMessage,
-  i18n: AppI18n,
-) {
-  switch (markup.kind) {
-    case 'command-input':
-      return <CommandInputRow content={markup.content} />
-    case 'command-output':
-      return (
-        <CommandOutputBlock
-          content={markup.content}
-          title={markup.title}
-          tone={markup.tone}
-          i18n={i18n}
-        />
-      )
-    case 'notice':
-      return (
-        <NoticeBlock content={markup.content} title={markup.title} tone={markup.tone} i18n={i18n} />
-      )
-    default:
-      return <SystemNotice content={fallbackMessage.content} i18n={i18n} />
+function getCharacterWidth(character: string): number {
+  if (character === '\t') {
+    return 2
   }
+
+  const codePoint = character.codePointAt(0)
+  if (!codePoint) {
+    return 1
+  }
+
+  if (
+    codePoint >= 0x1100 &&
+    (codePoint <= 0x115f ||
+      codePoint === 0x2329 ||
+      codePoint === 0x232a ||
+      (codePoint >= 0x2e80 && codePoint <= 0xa4cf && codePoint !== 0x303f) ||
+      (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+      (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+      (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
+      (codePoint >= 0xfe30 && codePoint <= 0xfe6f) ||
+      (codePoint >= 0xff00 && codePoint <= 0xff60) ||
+      (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
+      (codePoint >= 0x1f300 && codePoint <= 0x1f64f) ||
+      (codePoint >= 0x1f900 && codePoint <= 0x1f9ff) ||
+      (codePoint >= 0x20000 && codePoint <= 0x3fffd))
+  ) {
+    return 2
+  }
+
+  return 1
 }
 
-function MessageBlock(props: { message: ConversationMessage; i18n: AppI18n }) {
-  const structured = parseCliTranscriptMarkup(props.message.content)
+function getDisplayWidth(content: string): number {
+  let width = 0
+
+  for (const character of content) {
+    width += getCharacterWidth(character)
+  }
+
+  return width
+}
+
+function wrapContent(content: string, maxWidth: number): string[] {
+  // 按终端显示宽度折行，尽量减少中英文混排时的高度跳动。
+  const wrappedLines: string[] = []
+  const normalizedLines = content.replace(/\r\n/g, '\n').split('\n')
+
+  for (const line of normalizedLines) {
+    const normalizedLine = line.replace(/\t/g, '  ')
+
+    if (!normalizedLine) {
+      wrappedLines.push('')
+      continue
+    }
+
+    let currentLine = ''
+    let currentWidth = 0
+
+    for (const character of normalizedLine) {
+      const characterWidth = getCharacterWidth(character)
+
+      if (currentLine && currentWidth + characterWidth > maxWidth) {
+        wrappedLines.push(currentLine)
+        currentLine = character
+        currentWidth = characterWidth
+        continue
+      }
+
+      currentLine += character
+      currentWidth += characterWidth
+    }
+
+    wrappedLines.push(currentLine || '')
+  }
+
+  return wrappedLines.length > 0 ? wrappedLines : ['']
+}
+
+function appendWrappedRows(
+  rows: ViewportRow[],
+  options: {
+    keyPrefix: string
+    content: string
+    contentColor: string
+    contentWidth: number
+    indent?: number
+    prefix?: string
+    prefixColor?: string
+  },
+) {
+  const baseIndent = options.indent ?? 0
+  const prefixPadding = options.prefix ? getDisplayWidth(options.prefix) + 1 : 0
+  const availableContentWidth = Math.max(8, options.contentWidth - baseIndent - prefixPadding)
+  const lines = wrapContent(options.content, availableContentWidth)
+
+  lines.forEach((line, index) => {
+    rows.push({
+      kind: 'text',
+      key: `${options.keyPrefix}-${index}`,
+      content: line || ' ',
+      contentColor: options.contentColor,
+      indent: index === 0 ? baseIndent : baseIndent + prefixPadding,
+      prefix: index === 0 ? options.prefix : undefined,
+      prefixColor: index === 0 ? options.prefixColor : undefined,
+    })
+  })
+}
+
+function appendMessageRows(
+  rows: ViewportRow[],
+  message: ConversationMessage,
+  i18n: AppI18n,
+  contentWidth: number,
+) {
+  const structured = parseCliTranscriptMarkup(message.content)
 
   if (structured) {
-    return renderStructuredMessage(structured, props.message, props.i18n)
+    switch (structured.kind) {
+      case 'command-input':
+        appendWrappedRows(rows, {
+          keyPrefix: `${message.id}-command-input`,
+          prefix: '/',
+          prefixColor: adnifyTheme.brandStrong,
+          content: structured.content.replace(/^\//, ''),
+          contentColor: adnifyTheme.brandSoft,
+          contentWidth,
+        })
+        return
+      case 'command-output': {
+        const accentColor = resolveToneColor(structured.tone)
+
+        appendWrappedRows(rows, {
+          keyPrefix: `${message.id}-command-output-title`,
+          prefix: '|',
+          prefixColor: accentColor,
+          content: `${structured.title ?? i18n.t('conversation.output')} / ${i18n.t('conversation.localCommand')}`,
+          contentColor: accentColor,
+          contentWidth,
+        })
+        appendWrappedRows(rows, {
+          keyPrefix: `${message.id}-command-output-body`,
+          content: structured.content,
+          contentColor: adnifyTheme.textSecondary,
+          contentWidth,
+          indent: 2,
+        })
+        return
+      }
+      case 'notice': {
+        const accentColor = resolveToneColor(structured.tone)
+
+        appendWrappedRows(rows, {
+          keyPrefix: `${message.id}-notice-title`,
+          prefix: '~',
+          prefixColor: accentColor,
+          content: structured.title ?? i18n.t('conversation.notice'),
+          contentColor: accentColor,
+          contentWidth,
+        })
+        appendWrappedRows(rows, {
+          keyPrefix: `${message.id}-notice-body`,
+          content: structured.content,
+          contentColor: adnifyTheme.textMuted,
+          contentWidth,
+          indent: 2,
+        })
+        return
+      }
+    }
   }
 
-  switch (props.message.role) {
+  switch (message.role) {
     case 'assistant':
-      return <AssistantMessageBlock content={props.message.content} i18n={props.i18n} />
+      rows.push({
+        kind: 'text',
+        key: `${message.id}-assistant-header`,
+        prefix: 'adnify',
+        prefixColor: adnifyTheme.brand,
+        content: i18n.t('conversation.response'),
+        contentColor: adnifyTheme.textDim,
+      })
+      appendWrappedRows(rows, {
+        keyPrefix: `${message.id}-assistant-body`,
+        content: message.content,
+        contentColor: adnifyTheme.textPrimary,
+        contentWidth,
+        indent: 2,
+      })
+      return
     case 'user':
-      return <PromptMessage content={props.message.content} />
+      appendWrappedRows(rows, {
+        keyPrefix: `${message.id}-user`,
+        prefix: '>',
+        prefixColor: adnifyTheme.user,
+        content: message.content,
+        contentColor: adnifyTheme.textPrimary,
+        contentWidth,
+      })
+      return
     case 'system':
     default:
-      return <SystemNotice content={props.message.content} i18n={props.i18n} />
+      appendWrappedRows(rows, {
+        keyPrefix: `${message.id}-system-title`,
+        prefix: '*',
+        prefixColor: adnifyTheme.textDim,
+        content: i18n.t('conversation.notice'),
+        contentColor: adnifyTheme.textSecondary,
+        contentWidth,
+      })
+      appendWrappedRows(rows, {
+        keyPrefix: `${message.id}-system-body`,
+        content: message.content,
+        contentColor: adnifyTheme.textMuted,
+        contentWidth,
+        indent: 2,
+      })
   }
 }
 
-function ConfigWizard(props: { prompt: string }) {
-  const lines = props.prompt.split('\n')
-
-  return (
-    <Box flexDirection="column">
-      {lines.map((line, index) => (
-        <Text
-          key={`${index}-${line}`}
-          color={line.startsWith('  ') ? adnifyTheme.info : adnifyTheme.textSecondary}
-        >
-          {line}
-        </Text>
-      ))}
-    </Box>
-  )
-}
-
-function StreamingBlock(props: { text: string; i18n: AppI18n }) {
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Box gap={1}>
-        <Text color={adnifyTheme.brand}>adnify</Text>
-        <ActivityPulse active color={adnifyTheme.brandStrong} idleFrame="*" />
-        <Text color={adnifyTheme.textDim}>{props.i18n.t('conversation.thinking')}</Text>
-      </Box>
-      <BodyText content={props.text} color={adnifyTheme.textPrimary} indent={2} />
-    </Box>
-  )
-}
-
-export function ConversationViewport(props: ConversationViewportProps) {
+function buildViewportRows(
+  props: ConversationViewportProps,
+  contentWidth: number,
+): ViewportRow[] {
+  const rows: ViewportRow[] = []
   const showConfigWizard = Boolean(props.configInitPrompt)
+
+  if (showConfigWizard) {
+    const configLines = props.configInitPrompt?.split('\n') ?? []
+
+    configLines.forEach((line, index) => {
+      rows.push({
+        kind: 'text',
+        key: `config-${index}`,
+        content: line || ' ',
+        contentColor: line.startsWith('  ') ? adnifyTheme.info : adnifyTheme.textSecondary,
+      })
+    })
+
+    return rows
+  }
+
+  props.messages.forEach((message, index) => {
+    appendMessageRows(rows, message, props.i18n, contentWidth)
+
+    if (index < props.messages.length - 1 || props.streamingText) {
+      rows.push({ kind: 'spacer', key: `${message.id}-spacer` })
+    }
+  })
+
+  if (props.streamingText) {
+    rows.push({
+      kind: 'streaming-header',
+      key: 'streaming-header',
+      label: props.i18n.t('conversation.thinking'),
+    })
+    appendWrappedRows(rows, {
+      keyPrefix: 'streaming-body',
+      content: props.streamingText,
+      contentColor: adnifyTheme.textPrimary,
+      contentWidth,
+      indent: 2,
+    })
+  }
+
+  return rows
+}
+
+function renderViewportRow(row: ViewportRow) {
+  if (row.kind === 'spacer') {
+    return <Text key={row.key}>{' '}</Text>
+  }
+
+  if (row.kind === 'streaming-header') {
+    return (
+      <Box key={row.key} width="100%" gap={1}>
+        <Text color={adnifyTheme.brand}>adnify</Text>
+        <ActivityPulse active animated color={adnifyTheme.brandStrong} idleFrame=".  " />
+        <Text color={adnifyTheme.textDim}>{row.label}</Text>
+      </Box>
+    )
+  }
+
+  return (
+    <Box key={row.key} width="100%" marginLeft={row.indent ?? 0} gap={1}>
+      {row.prefix ? (
+        <Text color={row.prefixColor ?? adnifyTheme.textSecondary}>{row.prefix}</Text>
+      ) : null}
+      <Text color={row.contentColor} wrap="truncate-end">
+        {row.content}
+      </Text>
+    </Box>
+  )
+}
+
+export const ConversationViewport = memo(function ConversationViewport(
+  props: ConversationViewportProps,
+) {
+  const { stdout } = useStdout()
+  const showConfigWizard = Boolean(props.configInitPrompt)
+  const terminalColumns = stdout?.columns ?? 80
+  const contentWidth = useMemo(
+    () => Math.max(MIN_CONTENT_WIDTH, terminalColumns - PANEL_HORIZONTAL_CHROME),
+    [terminalColumns],
+  )
+  const viewportRows = useMemo(
+    () => buildViewportRows(props, contentWidth),
+    [contentWidth, props.configInitPrompt, props.i18n, props.messages, props.streamingText],
+  )
+  const visibleRows = useMemo(() => {
+    // 只保留尾部可见行，让长回复留在会话窗里，而不是继续把整个页面向下撑高。
+    if (viewportRows.length <= props.viewportRows) {
+      return viewportRows
+    }
+
+    return [
+      {
+        kind: 'text',
+        key: 'viewport-overflow-indicator',
+        content: '...',
+        contentColor: adnifyTheme.textDim,
+      } satisfies TextViewportRow,
+      ...viewportRows.slice(-(props.viewportRows - 1)),
+    ]
+  }, [props.viewportRows, viewportRows])
+  const fillerCount = Math.max(0, props.viewportRows - visibleRows.length)
 
   return (
     <Panel
@@ -219,15 +391,12 @@ export function ConversationViewport(props: ConversationViewportProps) {
       subtitle={showConfigWizard ? props.i18n.t('conversation.panelConfiguration') : undefined}
       accent={showConfigWizard ? 'warm' : 'muted'}
     >
-      {showConfigWizard ? <ConfigWizard prompt={props.configInitPrompt ?? ''} /> : null}
-
-      {!showConfigWizard && props.messages.length > 0
-        ? props.messages.map((message) => (
-            <MessageBlock key={message.id} message={message} i18n={props.i18n} />
-          ))
-        : null}
-
-      {props.streamingText ? <StreamingBlock text={props.streamingText} i18n={props.i18n} /> : null}
+      <Box height={props.viewportRows} flexDirection="column" overflowY="hidden">
+        {visibleRows.map((row) => renderViewportRow(row))}
+        {Array.from({ length: fillerCount }, (_, index) => (
+          <Text key={`viewport-filler-${index}`}>{' '}</Text>
+        ))}
+      </Box>
     </Panel>
   )
-}
+})

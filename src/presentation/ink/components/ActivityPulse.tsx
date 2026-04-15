@@ -1,22 +1,28 @@
 import { Text } from 'ink'
 import { useAnimatedFrames } from '../hooks/useAnimatedFrames'
 
-const PULSE_FRAMES = ['·  ', '·· ', '···', ' ··', '  ·'] as const
+const PULSE_FRAMES = ['.  ', '.. ', '...', ' ..', '  .'] as const
 
 export interface ActivityPulseProps {
   active?: boolean
+  animated?: boolean
   color?: string
   idleFrame?: string
 }
 
 /**
- * 小体积状态脉冲，用于输入区、状态栏、流式输出等场景。
+ * 小体积状态脉冲。
+ * 默认使用静态占位，只有显式开启动画时才做帧切换，避免运行态抖动。
  */
 export function ActivityPulse(props: ActivityPulseProps) {
   const frame = useAnimatedFrames(PULSE_FRAMES, {
-    active: props.active ?? true,
-    intervalMs: 120,
+    active: props.active && props.animated,
+    intervalMs: 140,
   })
 
-  return <Text color={props.color ?? 'cyanBright'}>{props.active ? frame : props.idleFrame ?? '·'}</Text>
+  return (
+    <Text color={props.color ?? 'cyanBright'}>
+      {props.active && props.animated ? frame : props.idleFrame ?? '.  '}
+    </Text>
+  )
 }

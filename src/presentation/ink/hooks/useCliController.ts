@@ -58,7 +58,61 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
 
   const busyRef = useRef(false)
   const bootKeyRef = useRef<string | null>(null)
+  const streamingBufferRef = useRef('')
+  const streamingFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const configInit = useConfigInit(i18n)
+
+  const flushStreamingBuffer = useCallback(() => {
+    if (streamingFlushTimerRef.current) {
+      clearTimeout(streamingFlushTimerRef.current)
+      streamingFlushTimerRef.current = null
+    }
+
+    if (!streamingBufferRef.current) {
+      return
+    }
+
+    const nextChunk = streamingBufferRef.current
+    streamingBufferRef.current = ''
+    setStreamingText((previous) => previous + nextChunk)
+  }, [])
+
+  const queueStreamingChunk = useCallback((delta: string) => {
+    streamingBufferRef.current += delta
+
+    if (streamingFlushTimerRef.current) {
+      return
+    }
+
+    streamingFlushTimerRef.current = setTimeout(() => {
+      streamingFlushTimerRef.current = null
+      if (!streamingBufferRef.current) {
+        return
+      }
+
+      const nextChunk = streamingBufferRef.current
+      streamingBufferRef.current = ''
+      setStreamingText((previous) => previous + nextChunk)
+    }, 32)
+  }, [])
+
+  const resetStreamingState = useCallback(() => {
+    if (streamingFlushTimerRef.current) {
+      clearTimeout(streamingFlushTimerRef.current)
+      streamingFlushTimerRef.current = null
+    }
+
+    streamingBufferRef.current = ''
+    setStreamingText('')
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (streamingFlushTimerRef.current) {
+        clearTimeout(streamingFlushTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const bootKey = params.cwd
@@ -242,30 +296,31 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
         return
       }
 
-      setStreamingText('')
+      resetStreamingState()
 
       const result = await params.runtime.useCases.submitPrompt.executeStreaming(
         { sessionId: session.id, prompt: nextInput },
         {
           onChunk: (delta) => {
-            setStreamingText((previous) => previous + delta)
+            queueStreamingChunk(delta)
           },
           onDone: () => {
-            setStreamingText('')
+            flushStreamingBuffer()
           },
           onError: (error) => {
-            setStreamingText('')
+            flushStreamingBuffer()
             setStatusLine(i18n.t('status.responseFailed', { message: error.message }))
           },
         },
       )
 
       setSession(result.session)
+      resetStreamingState()
       setStatusLine(result.statusLine)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       setStatusLine(i18n.t('status.executionFailed', { message }))
-      setStreamingText('')
+      resetStreamingState()
     } finally {
       busyRef.current = false
       setIsBusy(false)
@@ -274,10 +329,13 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     bootstrap,
     commandSuggestions,
     configInit,
+    flushStreamingBuffer,
     i18n,
     inputValue,
     isSuggestionOpen,
     params,
+    queueStreamingChunk,
+    resetStreamingState,
     selectedSuggestionIndex,
     session,
   ])

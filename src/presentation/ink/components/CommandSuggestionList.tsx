@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import { memo } from 'react'
 import { adnifyTheme } from '../theme'
 
 export interface CommandSuggestionItem {
@@ -11,10 +12,21 @@ export interface CommandSuggestionListProps {
   selectedIndex: number
 }
 
-export function CommandSuggestionList(props: CommandSuggestionListProps) {
+const MAX_VISIBLE_COMMANDS = 4
+
+export const CommandSuggestionList = memo(function CommandSuggestionList(
+  props: CommandSuggestionListProps,
+) {
   if (props.items.length === 0) {
     return null
   }
+
+  const startIndex = Math.max(
+    0,
+    Math.min(props.selectedIndex - (MAX_VISIBLE_COMMANDS - 1), props.items.length - MAX_VISIBLE_COMMANDS),
+  )
+  const visibleItems = props.items.slice(startIndex, startIndex + MAX_VISIBLE_COMMANDS)
+  const hiddenCount = Math.max(0, props.items.length - visibleItems.length)
 
   return (
     <Box
@@ -24,8 +36,8 @@ export function CommandSuggestionList(props: CommandSuggestionListProps) {
       borderColor={adnifyTheme.borderMuted}
       paddingX={1}
     >
-      {props.items.map((item, index) => {
-        const selected = index === props.selectedIndex
+      {visibleItems.map((item, index) => {
+        const selected = startIndex + index === props.selectedIndex
 
         return (
           <Box key={item.command} gap={1}>
@@ -46,6 +58,7 @@ export function CommandSuggestionList(props: CommandSuggestionListProps) {
           </Box>
         )
       })}
+      {hiddenCount > 0 ? <Text color={adnifyTheme.textDim}>... +{hiddenCount}</Text> : null}
     </Box>
   )
-}
+})
