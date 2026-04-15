@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink'
-import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
+import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
 import { adnifyTheme } from '../theme'
 import { ActivityPulse } from './ActivityPulse'
 import { Panel } from './Panel'
@@ -36,45 +36,49 @@ function ModeBadge(props: { mode: AssistantMode; busy?: boolean }) {
   )
 }
 
+function MetaPill(props: { label: string; value: string; color?: string }) {
+  return (
+    <Text backgroundColor={adnifyTheme.backgroundHint}>
+      {' '}
+      <Text color={adnifyTheme.textDim}>{props.label}</Text>
+      <Text color={props.color ?? adnifyTheme.textSecondary}>{props.value}</Text>
+      {' '}
+    </Text>
+  )
+}
+
 export function HeaderBar(props: HeaderBarProps) {
-  const gitLabel = props.isGitRepository ? 'git tracked' : 'git detached'
+  const gitLabel = props.isGitRepository ? 'tracked' : 'detached'
   const gitColor = props.isGitRepository ? adnifyTheme.success : adnifyTheme.warm
 
   return (
     <Panel accent={props.busy ? 'brand' : 'muted'}>
-      <Box width="100%" justifyContent="space-between">
-        <Box flexDirection="column" flexGrow={1}>
+      <Box width="100%" justifyContent="space-between" alignItems="flex-start">
+        <Box flexDirection="column" flexGrow={1} marginRight={2}>
           <Wordmark
             appName={props.appName}
             author={props.author}
             tagline={props.tagline}
             busy={props.busy}
           />
-        </Box>
 
-        <Box flexDirection="column" alignItems="flex-end" marginLeft={3}>
-          <ModeBadge mode={props.mode} busy={props.busy} />
-          <Box flexDirection="column" alignItems="flex-end" marginTop={1}>
-            <Text color={adnifyTheme.textDim}>model</Text>
-            <Text color={adnifyTheme.textSecondary}>{props.modelLabel}</Text>
+          <Box gap={1} marginTop={1}>
+            <ActivityPulse active={props.busy} color={adnifyTheme.brandStrong} idleFrame="*" />
+            <MetaPill label="workspace " value={props.workspaceName} />
+            {props.packageManager ? (
+              <MetaPill label="pkg " value={props.packageManager} color={adnifyTheme.brandSoft} />
+            ) : null}
+            {props.isGitRepository !== undefined ? (
+              <MetaPill label="git " value={gitLabel} color={gitColor} />
+            ) : null}
           </Box>
         </Box>
-      </Box>
 
-      <Box width="100%" justifyContent="space-between" marginTop={1}>
-        <Box gap={1}>
-          <ActivityPulse active={props.busy} color={adnifyTheme.brandStrong} idleFrame="·" />
-          <Text color={adnifyTheme.textDim}>workspace</Text>
-          <Text color={adnifyTheme.textSecondary}>{props.workspaceName}</Text>
-        </Box>
-
-        <Box gap={2}>
-          {props.packageManager ? (
-            <Text color={adnifyTheme.brandSoft}>{props.packageManager}</Text>
-          ) : null}
-          {props.isGitRepository !== undefined ? (
-            <Text color={gitColor}>{gitLabel}</Text>
-          ) : null}
+        <Box flexDirection="column" alignItems="flex-end" flexShrink={0}>
+          <ModeBadge mode={props.mode} busy={props.busy} />
+          <Text color={adnifyTheme.textMuted} wrap="truncate-end">
+            {props.modelLabel}
+          </Text>
         </Box>
       </Box>
     </Panel>

@@ -11,7 +11,7 @@ export interface WordmarkProps {
 
 export function Wordmark(props: WordmarkProps) {
   return (
-    <Box gap={1} alignItems="center">
+    <Box gap={1} alignItems="flex-start">
       <MascotGlyph active={props.busy} />
       <Box flexDirection="column">
         <Box gap={1}>

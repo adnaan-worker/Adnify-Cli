@@ -21,19 +21,28 @@ export function CommandSuggestionList(props: CommandSuggestionListProps) {
       flexDirection="column"
       marginTop={1}
       borderStyle="round"
-      borderColor={adnifyTheme.border}
+      borderColor={adnifyTheme.borderMuted}
       paddingX={1}
     >
       {props.items.map((item, index) => {
         const selected = index === props.selectedIndex
 
         return (
-          <Box key={item.command} gap={2}>
+          <Box key={item.command} gap={1}>
             <Text color={selected ? adnifyTheme.brandStrong : adnifyTheme.textDim}>
-              {selected ? '>' : ' '}
+              {selected ? '>' : '-'}
             </Text>
-            <Text color={selected ? adnifyTheme.brand : adnifyTheme.textPrimary}>{item.command}</Text>
-            <Text color={adnifyTheme.textMuted}>{item.description}</Text>
+            <Text
+              color={selected ? adnifyTheme.brand : adnifyTheme.textSecondary}
+              backgroundColor={selected ? adnifyTheme.backgroundHint : undefined}
+            >
+              {' '}
+              {item.command}
+              {' '}
+            </Text>
+            <Text color={selected ? adnifyTheme.textPrimary : adnifyTheme.textMuted}>
+              {item.description}
+            </Text>
           </Box>
         )
       })}

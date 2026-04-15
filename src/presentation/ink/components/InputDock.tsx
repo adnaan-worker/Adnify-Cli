@@ -1,8 +1,8 @@
 import { Box, Text } from 'ink'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
 import { adnifyTheme } from '../theme'
-import type { CommandSuggestionItem } from './CommandSuggestionList'
 import { ActivityPulse } from './ActivityPulse'
+import type { CommandSuggestionItem } from './CommandSuggestionList'
 import { CommandSuggestionList } from './CommandSuggestionList'
 import { Panel } from './Panel'
 
@@ -18,31 +18,40 @@ export interface InputDockProps {
 
 function placeholderText(busy: boolean): string {
   if (busy) {
-    return '正在处理当前任务，请稍候…'
+    return 'Working on the current task...'
   }
 
-  return '输入任务、需求或命令，按 Enter 发送；输入 / 或 : 可快速查看命令'
+  return 'Describe the task, or type / to open commands.'
 }
 
 export function InputDock(props: InputDockProps) {
   return (
-    <Panel title="Prompt" accent={props.busy ? 'brand' : 'muted'}>
-      <Box gap={1}>
-        <ActivityPulse
-          active={props.busy}
-          color={props.busy ? adnifyTheme.brandStrong : adnifyTheme.textDim}
-          idleFrame="·"
-        />
-        <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.textMuted}>
-          {props.busy ? 'responding' : 'ready'}
+    <Panel title="Console" accent={props.busy ? 'brand' : 'muted'}>
+      <Box width="100%" justifyContent="space-between" alignItems="center">
+        <Box gap={1}>
+          <ActivityPulse
+            active={props.busy}
+            color={props.busy ? adnifyTheme.brandStrong : adnifyTheme.textDim}
+            idleFrame="*"
+          />
+          <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.textMuted}>
+            {props.busy ? 'responding' : 'ready'}
+          </Text>
+        </Box>
+
+        <Text color={adnifyTheme.textDim}>
+          {props.isSuggestionOpen ? 'command palette' : `mode ${props.mode}`}
         </Text>
       </Box>
 
-      <Box marginTop={1} flexDirection="column">
-        <Text color={adnifyTheme.textPrimary}>
-          <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.success}>{props.busy ? '...' : '>'} </Text>
-          {props.value ? props.value : <Text color={adnifyTheme.textDim}>{placeholderText(props.busy)}</Text>}
-        </Text>
+      <Box marginTop={1}>
+        <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.success}>{props.busy ? '...' : '>'}</Text>
+        <Text> </Text>
+        {props.value ? (
+          <Text color={adnifyTheme.textPrimary}>{props.value}</Text>
+        ) : (
+          <Text color={adnifyTheme.textDim}>{placeholderText(props.busy)}</Text>
+        )}
       </Box>
 
       {props.isSuggestionOpen ? (
@@ -51,10 +60,12 @@ export function InputDock(props: InputDockProps) {
             items={props.commandSuggestions}
             selectedIndex={props.selectedSuggestionIndex}
           />
-          <Text color={adnifyTheme.textDim}>Up/Down 选择 · Tab 补全 · Enter 执行</Text>
+          <Text color={adnifyTheme.textDim}>Up/Down select  Tab complete  Enter run</Text>
         </Box>
       ) : (
-        <Text color={adnifyTheme.textDim}>Enter 发送 · `/` 命令面板</Text>
+        <Text color={adnifyTheme.textDim} wrap="truncate-end">
+          Enter to send. Model: {props.modelLabel}
+        </Text>
       )}
     </Panel>
   )

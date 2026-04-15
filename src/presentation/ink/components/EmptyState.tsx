@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink'
-import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
+import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
 import { adnifyTheme } from '../theme'
 import { Panel } from './Panel'
 import { Wordmark } from './Wordmark'
@@ -37,62 +37,82 @@ function ModeBadge(props: { mode: AssistantMode; busy?: boolean }) {
   )
 }
 
+function MetaPill(props: { label: string; value: string; color?: string }) {
+  return (
+    <Text backgroundColor={adnifyTheme.backgroundHint}>
+      {' '}
+      <Text color={adnifyTheme.textDim}>{props.label}</Text>
+      <Text color={props.color ?? adnifyTheme.textSecondary}>{props.value}</Text>
+      {' '}
+    </Text>
+  )
+}
+
+function QuickCommandItem(props: { command: string }) {
+  return (
+    <Box gap={1}>
+      <Text color={adnifyTheme.brandStrong}>{'>'}</Text>
+      <Text color={adnifyTheme.textPrimary}>{props.command}</Text>
+    </Box>
+  )
+}
+
 export function EmptyState(props: EmptyStateProps) {
-  const gitLabel = props.isGitRepository ? 'git tracked' : 'git detached'
+  const gitLabel = props.isGitRepository ? 'tracked' : 'detached'
   const gitColor = props.isGitRepository ? adnifyTheme.success : adnifyTheme.warm
 
   return (
     <Panel accent="brand">
-      <Box width="100%" justifyContent="space-between">
-        <Box flexDirection="column" flexGrow={1}>
+      <Box width="100%" justifyContent="space-between" alignItems="flex-start">
+        <Box flexDirection="column" flexGrow={1} marginRight={3}>
           <Wordmark
             appName={props.assistantName}
             author={props.author}
             tagline={props.tagline}
             busy={props.busy}
           />
-          <Text color={adnifyTheme.textMuted} wrap="truncate-end">
-            {props.description}
-          </Text>
-        </Box>
 
-        <Box flexDirection="column" alignItems="flex-end" marginLeft={4}>
-          <ModeBadge mode={props.mode} busy={props.busy} />
-          <Box flexDirection="column" alignItems="flex-end" marginTop={1}>
-            <Text color={adnifyTheme.textDim}>model</Text>
-            <Text color={adnifyTheme.textSecondary}>{props.modelLabel}</Text>
+          <Box flexDirection="column" marginTop={1}>
+            <Text color={adnifyTheme.textMuted}>{props.description}</Text>
+            <Text color={adnifyTheme.textDim}>
+              Start with a goal, a file, or `/` for the command panel.
+            </Text>
+          </Box>
+
+          <Box gap={1} marginTop={1}>
+            <MetaPill label="workspace " value={props.workspaceName} />
+            <MetaPill
+              label="pkg "
+              value={props.packageManager}
+              color={adnifyTheme.brandSoft}
+            />
+            <MetaPill label="git " value={gitLabel} color={gitColor} />
           </Box>
         </Box>
-      </Box>
 
-      <Box width="100%" justifyContent="space-between" marginTop={1}>
-        <Box gap={1}>
-          <Text color={adnifyTheme.textDim}>workspace</Text>
-          <Text color={adnifyTheme.textSecondary}>{props.workspaceName}</Text>
-        </Box>
-        <Box gap={2}>
-          <Text color={adnifyTheme.brandSoft}>{props.packageManager}</Text>
-          <Text color={gitColor}>{gitLabel}</Text>
-        </Box>
-      </Box>
+        <Box width={34} flexDirection="column" flexShrink={0}>
+          <Box alignItems="center" justifyContent="space-between">
+            <Text color={adnifyTheme.textDim}>session</Text>
+            <ModeBadge mode={props.mode} busy={props.busy} />
+          </Box>
 
-      <Box width="100%" justifyContent="flex-end" marginTop={1}>
-        <Box
-          flexDirection="column"
-          borderStyle="round"
-          borderColor={adnifyTheme.borderMuted}
-          paddingX={1}
-          width={30}
-        >
-          <Text color={adnifyTheme.brandSoft}>Quick start</Text>
-          <Text color={adnifyTheme.textDim}>可以这样开始：</Text>
-          <Box marginTop={1} flexDirection="column">
-            {props.commands.slice(0, 4).map((command) => (
-              <Box key={command} gap={1}>
-                <Text color={adnifyTheme.brand}>›</Text>
-                <Text color={adnifyTheme.success}>{command}</Text>
-              </Box>
-            ))}
+          <Box
+            flexDirection="column"
+            marginTop={1}
+            borderStyle="round"
+            borderColor={adnifyTheme.borderMuted}
+            paddingX={1}
+          >
+            <Text color={adnifyTheme.brandSoft}>Quick start</Text>
+            <Text color={adnifyTheme.textDim} wrap="truncate-end">
+              {props.modelLabel}
+            </Text>
+
+            <Box flexDirection="column" marginTop={1}>
+              {props.commands.slice(0, 4).map((command) => (
+                <QuickCommandItem key={command} command={command} />
+              ))}
+            </Box>
           </Box>
         </Box>
       </Box>
