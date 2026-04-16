@@ -39,6 +39,11 @@ const COMMAND_DESCRIPTION_KEYS: Record<string, string> = {
   ':model [provider] [model]': 'command.desc.model',
   ':config': 'command.desc.config',
   ':config init': 'command.desc.configInit',
+  ':config set provider [value]': 'command.desc.config',
+  ':config set model [value]': 'command.desc.config',
+  ':config set api-key [value]': 'command.desc.config',
+  ':config set base-url [value]': 'command.desc.config',
+  ':config clear api-key': 'command.desc.config',
   ':session': 'command.desc.session',
   ':sessions': 'command.desc.sessions',
   ':resume [index|id]': 'command.desc.resume',
@@ -308,6 +313,15 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
           sessionId: session.id,
           commandLine: nextInput,
           bootstrap,
+          configUpdater: {
+            applyModelConfig: (nextConfig) => {
+              const activeConfig = params.runtime.applyModelConfig(nextConfig)
+              setBootstrap((previous) =>
+                previous ? { ...previous, modelConfig: activeConfig } : previous,
+              )
+              return activeConfig
+            },
+          },
           modelSwitcher: {
             switchModel: (providerName, modelName) => {
               const newConfig = params.runtime.switchModel(providerName, modelName)

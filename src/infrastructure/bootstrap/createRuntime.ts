@@ -11,6 +11,7 @@ import { ListSessionsUseCase } from '../../application/use-cases/ListSessionsUse
 import { ResolveStartupSessionUseCase } from '../../application/use-cases/ResolveStartupSessionUseCase'
 import { SubmitPromptUseCase } from '../../application/use-cases/SubmitPromptUseCase'
 import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
+import type { ModelConfigStorePort } from '../../application/ports/ModelConfigStorePort'
 import { DefaultCliConfigAdapter } from '../config/DefaultCliConfigAdapter'
 import { AiSdkGateway } from '../llm/AiSdkGateway'
 import { ModelAssistantResponder } from '../llm/ModelAssistantResponder'
@@ -42,17 +43,23 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
   config.setPromptBundle(promptBundle)
 
   const { loadModelConfig, loadProviders } = await import('../config/loadLocalConfig')
+  const { writeModelConfig } = await import('../config/writeLocalConfig')
   const modelConfig = await loadModelConfig()
   const providers = await loadProviders()
   config.setModelConfig(modelConfig)
   config.setProviders(providers)
+  const modelConfigStore: ModelConfigStorePort = {
+    save: writeModelConfig,
+  }
 
-  const { responder, gateway } = createResponderStack(modelConfig, config, logger, i18n)
+  const initialStack = createResponderStack(modelConfig, config, logger, i18n)
+  let currentResponder = initialStack.responder
+  let currentGateway = initialStack.gateway
 
   const submitPrompt = new SubmitPromptUseCase(
     sessionRepository,
     workspaceContextService,
-    responder,
+    currentResponder,
     config,
     idGenerator,
     clock,
@@ -72,29 +79,37 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
     logger,
   )
 
+  const activateModelConfig = (newConfig: ModelConfig): ModelConfig => {
+    config.setModelConfig(newConfig)
+
+    if (currentGateway && currentResponder instanceof ModelAssistantResponder && newConfig.apiKey) {
+      currentGateway.updateConfig(newConfig)
+      currentResponder.updateGateway(currentGateway, newConfig)
+      logger.info('Model config updated via AI SDK', {
+        model: newConfig.model,
+        provider: newConfig.provider,
+      })
+      return newConfig
+    }
+
+    const newStack = createResponderStack(newConfig, config, logger, i18n)
+    currentResponder = newStack.responder
+    currentGateway = newStack.gateway
+    submitPrompt.updateResponder(currentResponder)
+    logger.info('Model config updated (new responder)', {
+      model: newConfig.model,
+      provider: newConfig.provider,
+    })
+    return newConfig
+  }
+
   const switchModel = (providerName: string, modelName?: string): ModelConfig | null => {
     const newConfig = config.switchModel(providerName, modelName)
     if (!newConfig) {
       return null
     }
 
-    if (gateway && responder instanceof ModelAssistantResponder) {
-      gateway.updateConfig(newConfig)
-      responder.updateGateway(gateway, newConfig)
-      logger.info('Model switched via AI SDK', {
-        model: newConfig.model,
-        provider: newConfig.provider,
-      })
-    } else {
-      const newStack = createResponderStack(newConfig, config, logger, i18n)
-      submitPrompt.updateResponder(newStack.responder)
-      logger.info('Model switched (new responder)', {
-        model: newConfig.model,
-        provider: newConfig.provider,
-      })
-    }
-
-    return newConfig
+    return activateModelConfig(newConfig)
   }
 
   return {
@@ -108,6 +123,7 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
       applyCliCommand: new ApplyCliCommandUseCase(
         sessionRepository,
         storageSettings,
+        modelConfigStore,
         idGenerator,
         clock,
         logger,
@@ -115,6 +131,7 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
       ),
     },
     switchModel,
+    applyModelConfig: activateModelConfig,
   }
 }
 

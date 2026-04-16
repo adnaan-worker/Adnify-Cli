@@ -171,6 +171,11 @@ bunx tsc --noEmit
 - `:model [provider] [model]`
 - `:config`
 - `:config init`
+- `:config set provider [value]`
+- `:config set model [value]`
+- `:config set api-key [value]`
+- `:config set base-url [value]`
+- `:config clear api-key`
 - `:session`
 - `:sessions`
 - `:resume [index|id]`

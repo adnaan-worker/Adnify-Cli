@@ -11,6 +11,11 @@ These commands are handled by the CLI itself instead of being sent to the model.
 - :model [provider] [model]
 - :config
 - :config init
+- :config set provider [value]
+- :config set model [value]
+- :config set api-key [value]
+- :config set base-url [value]
+- :config clear api-key
 - :session
 - :storage
 - :storage set [path]

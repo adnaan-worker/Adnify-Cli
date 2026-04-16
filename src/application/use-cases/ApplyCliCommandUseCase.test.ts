@@ -8,6 +8,7 @@ import { createAppI18n } from '../i18n/AppI18n'
 import type { ClockPort } from '../ports/ClockPort'
 import type { IdGeneratorPort } from '../ports/IdGeneratorPort'
 import type { LoggerPort } from '../ports/LoggerPort'
+import type { ModelConfigStorePort } from '../ports/ModelConfigStorePort'
 import type { SessionRepositoryPort } from '../ports/SessionRepositoryPort'
 import type { StorageSettingsPort } from '../ports/StorageSettingsPort'
 import { parseCliTranscriptMarkup } from '../support/CliTranscriptMarkup'
@@ -107,6 +108,17 @@ function createMockStorageSettings(): StorageSettingsPort {
   }
 }
 
+function createMockModelConfigStore(): ModelConfigStorePort & { saved: ModelConfig[] } {
+  const saved: ModelConfig[] = []
+
+  return {
+    saved,
+    save: async (config) => {
+      saved.push({ ...config })
+    },
+  }
+}
+
 function createBootstrapSnapshot() {
   return {
     profile: new AssistantProfile({
@@ -165,6 +177,11 @@ function createBootstrapSnapshot() {
       ':model',
       ':config',
       ':session',
+      ':config set provider [value]',
+      ':config set model [value]',
+      ':config set api-key [value]',
+      ':config set base-url [value]',
+      ':config clear api-key',
       ':storage',
       ':storage set [path]',
       ':storage reset',
@@ -190,6 +207,7 @@ describe('ApplyCliCommandUseCase', () => {
     const useCase = new ApplyCliCommandUseCase(
       repo,
       createMockStorageSettings(),
+      createMockModelConfigStore(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:01:00.000Z')),
       createMockLogger(),
@@ -234,6 +252,7 @@ describe('ApplyCliCommandUseCase', () => {
     const useCase = new ApplyCliCommandUseCase(
       repo,
       createMockStorageSettings(),
+      createMockModelConfigStore(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:02:00.000Z')),
       createMockLogger(),
@@ -282,6 +301,7 @@ describe('ApplyCliCommandUseCase', () => {
     const useCase = new ApplyCliCommandUseCase(
       repo,
       createMockStorageSettings(),
+      createMockModelConfigStore(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:12:00.000Z')),
       createMockLogger(),
@@ -329,6 +349,7 @@ describe('ApplyCliCommandUseCase', () => {
     const useCase = new ApplyCliCommandUseCase(
       repo,
       createMockStorageSettings(),
+      createMockModelConfigStore(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:12:00.000Z')),
       createMockLogger(),
@@ -359,6 +380,7 @@ describe('ApplyCliCommandUseCase', () => {
     const useCase = new ApplyCliCommandUseCase(
       repo,
       createMockStorageSettings(),
+      createMockModelConfigStore(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:03:00.000Z')),
       createMockLogger(),
@@ -393,6 +415,7 @@ describe('ApplyCliCommandUseCase', () => {
     const useCase = new ApplyCliCommandUseCase(
       repo,
       createMockStorageSettings(),
+      createMockModelConfigStore(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:04:00.000Z')),
       createMockLogger(),
@@ -410,5 +433,43 @@ describe('ApplyCliCommandUseCase', () => {
     expect(output?.content).toContain('Current session:')
     expect(output?.content).toContain('Current session title')
     expect(output?.content).toContain('sess-meta')
+  })
+
+  test('should update model config via command subcommand', async () => {
+    const repo = createMockSessionRepo()
+    const store = createMockModelConfigStore()
+    const session = ConversationSession.create({
+      id: 'sess-config',
+      title: 'Config',
+      mode: 'agent',
+      workspacePath: 'E:/26Project/Adnify-Cli',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    })
+    await repo.save(session)
+
+    const useCase = new ApplyCliCommandUseCase(
+      repo,
+      createMockStorageSettings(),
+      store,
+      createMockIdGenerator(),
+      createMockClock(new Date('2026-01-01T00:05:00.000Z')),
+      createMockLogger(),
+      createAppI18n('en'),
+    )
+
+    const result = await useCase.execute({
+      sessionId: session.id,
+      commandLine: ':config set model gpt-5',
+      bootstrap: createBootstrapSnapshot(),
+      configUpdater: {
+        applyModelConfig: (config) => config,
+      },
+    })
+
+    const output = parseCliTranscriptMarkup(result.session.getMessages()[1]?.content ?? '')
+    expect(output?.kind).toBe('command-output')
+    expect(output?.content).toContain('Configuration updated.')
+    expect(store.saved[0]?.model).toBe('gpt-5')
+    expect(result.statusLine).toContain('Configuration updated')
   })
 })

@@ -18,4 +18,5 @@ export interface AdnifyCliRuntime {
     applyCliCommand: ApplyCliCommandUseCase
   }
   switchModel: (providerName: string, modelName?: string) => ModelConfig | null
+  applyModelConfig: (config: ModelConfig) => ModelConfig
 }

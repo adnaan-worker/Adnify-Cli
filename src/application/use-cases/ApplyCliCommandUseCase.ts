@@ -10,8 +10,10 @@ import type { AppI18n } from '../i18n/AppI18n'
 import type { ClockPort } from '../ports/ClockPort'
 import type { IdGeneratorPort } from '../ports/IdGeneratorPort'
 import type { LoggerPort } from '../ports/LoggerPort'
+import type { ModelConfigStorePort } from '../ports/ModelConfigStorePort'
 import type { SessionRepositoryPort } from '../ports/SessionRepositoryPort'
 import type { StorageSettingsPort } from '../ports/StorageSettingsPort'
+import type { ModelConfig, ModelProvider } from '../../domain/assistant/value-objects/ModelConfig'
 import {
   createCliCommandInputContent,
   createCliCommandOutputContent,
@@ -22,10 +24,15 @@ export interface ModelSwitcher {
   switchModel: (providerName: string, modelName?: string) => { model: string; baseUrl: string } | null
 }
 
+export interface ConfigUpdater {
+  applyModelConfig: (config: ModelConfig) => ModelConfig
+}
+
 export interface ApplyCliCommandCommand {
   sessionId: string
   commandLine: string
   bootstrap: BootstrapSnapshot
+  configUpdater?: ConfigUpdater
   modelSwitcher?: ModelSwitcher
 }
 
@@ -39,6 +46,7 @@ export class ApplyCliCommandUseCase {
   constructor(
     private readonly sessionRepository: SessionRepositoryPort,
     private readonly storageSettings: StorageSettingsPort,
+    private readonly modelConfigStore: ModelConfigStorePort,
     private readonly idGenerator: IdGeneratorPort,
     private readonly clock: ClockPort,
     private readonly logger: LoggerPort,
@@ -229,6 +237,86 @@ export class ApplyCliCommandUseCase {
 
       case 'config': {
         addCommandInput()
+        const subcommand = args[0]?.toLowerCase()
+
+        if (subcommand === 'set') {
+          const field = args[1]?.toLowerCase()
+          const value = rawArgs.replace(/^set\s+\S+\s*/i, '').trim()
+
+          if (!field || !value) {
+            addCommandOutput(formatConfigCommandHelp(this.i18n), {
+              title: this.i18n.t('transcript.config'),
+              tone: 'warning',
+            })
+            return persist(this.i18n.t('cli.config.commandInvalidStatus'))
+          }
+
+          const nextConfigResult = updateModelConfigField(
+            command.bootstrap.modelConfig,
+            field,
+            value,
+            this.i18n,
+          )
+          if (!nextConfigResult.ok) {
+            addCommandOutput(
+              [nextConfigResult.message, '', formatConfigCommandHelp(this.i18n)].join('\n'),
+              {
+                title: this.i18n.t('transcript.config'),
+                tone: 'warning',
+              },
+            )
+            return persist(this.i18n.t('cli.config.commandInvalidStatus'))
+          }
+
+          await this.modelConfigStore.save(nextConfigResult.config)
+          const activeConfig = command.configUpdater?.applyModelConfig(nextConfigResult.config)
+          const finalConfig = activeConfig ?? nextConfigResult.config
+
+          addCommandOutput(formatConfigUpdatedText(finalConfig, field, this.i18n), {
+            title: this.i18n.t('transcript.config'),
+            tone: 'success',
+          })
+          return persist(this.i18n.t('cli.config.updatedStatus'))
+        }
+
+        if (subcommand === 'clear') {
+          const field = args[1]?.toLowerCase()
+
+          if (!field) {
+            addCommandOutput(formatConfigCommandHelp(this.i18n), {
+              title: this.i18n.t('transcript.config'),
+              tone: 'warning',
+            })
+            return persist(this.i18n.t('cli.config.commandInvalidStatus'))
+          }
+
+          const nextConfigResult = clearModelConfigField(
+            command.bootstrap.modelConfig,
+            field,
+            this.i18n,
+          )
+          if (!nextConfigResult.ok) {
+            addCommandOutput(
+              [nextConfigResult.message, '', formatConfigCommandHelp(this.i18n)].join('\n'),
+              {
+                title: this.i18n.t('transcript.config'),
+                tone: 'warning',
+              },
+            )
+            return persist(this.i18n.t('cli.config.commandInvalidStatus'))
+          }
+
+          await this.modelConfigStore.save(nextConfigResult.config)
+          const activeConfig = command.configUpdater?.applyModelConfig(nextConfigResult.config)
+          const finalConfig = activeConfig ?? nextConfigResult.config
+
+          addCommandOutput(formatConfigClearedText(finalConfig, field, this.i18n), {
+            title: this.i18n.t('transcript.config'),
+            tone: 'success',
+          })
+          return persist(this.i18n.t('cli.config.updatedStatus'))
+        }
+
         const modelConfig = command.bootstrap.modelConfig
         const storage = (await this.storageSettings.inspect()).effectiveStorage
         const maskedKey = modelConfig.apiKey
@@ -251,6 +339,8 @@ export class ApplyCliCommandUseCase {
           this.i18n.t('cli.config.dataRoot', { value: storage.dataRoot }),
           this.i18n.t('cli.config.configFile', { value: storage.configPath }),
           this.i18n.t('cli.config.sessionsDir', { value: storage.sessionsDir }),
+          '',
+          formatConfigCommandHelp(this.i18n),
           '',
           this.i18n.t('cli.config.howTo'),
           howToFile,
@@ -491,6 +581,174 @@ function formatCurrentSession(session: ConversationSession, i18n: AppI18n): stri
     i18n.t('cli.session.messageCount', { value: session.getMessages().length }),
     i18n.t('cli.session.updatedAt', { value: session.updatedAt.toISOString() }),
   ].join('\n')
+}
+
+function formatConfigCommandHelp(i18n: AppI18n): string {
+  return [
+    i18n.t('cli.config.commandHelpTitle'),
+    i18n.t('cli.config.commandHelpSetProvider'),
+    i18n.t('cli.config.commandHelpSetModel'),
+    i18n.t('cli.config.commandHelpSetApiKey'),
+    i18n.t('cli.config.commandHelpSetBaseUrl'),
+    i18n.t('cli.config.commandHelpSetMaxTokens'),
+    i18n.t('cli.config.commandHelpSetTemperature'),
+    i18n.t('cli.config.commandHelpSetTimeout'),
+    i18n.t('cli.config.commandHelpClearApiKey'),
+    i18n.t('cli.config.commandHelpInit'),
+  ].join('\n')
+}
+
+function formatConfigUpdatedText(config: ModelConfig, field: string, i18n: AppI18n): string {
+  return [
+    i18n.t('cli.config.updated'),
+    i18n.t('cli.config.updatedField', { value: field }),
+    i18n.t('cli.model.current', {
+      model: config.model,
+      baseUrl: config.baseUrl,
+    }),
+  ].join('\n')
+}
+
+function formatConfigClearedText(config: ModelConfig, field: string, i18n: AppI18n): string {
+  return [
+    i18n.t('cli.config.cleared'),
+    i18n.t('cli.config.updatedField', { value: field }),
+    i18n.t('cli.model.current', {
+      model: config.model,
+      baseUrl: config.baseUrl,
+    }),
+  ].join('\n')
+}
+
+function updateModelConfigField(
+  config: ModelConfig,
+  field: string,
+  rawValue: string,
+  i18n: AppI18n,
+): { ok: true; config: ModelConfig } | { ok: false; message: string } {
+  const value = rawValue.trim()
+  switch (field) {
+    case 'provider': {
+      if (!isModelProvider(value)) {
+        return { ok: false, message: i18n.t('cli.config.errorUnsupportedProvider', { value }) }
+      }
+
+      return {
+        ok: true,
+        config: {
+          ...config,
+          provider: value,
+        },
+      }
+    }
+    case 'model':
+      return {
+        ok: true,
+        config: {
+          ...config,
+          model: value,
+        },
+      }
+    case 'api-key':
+    case 'apikey':
+    case 'key':
+      return {
+        ok: true,
+        config: {
+          ...config,
+          apiKey: value,
+        },
+      }
+    case 'base-url':
+    case 'baseurl':
+      return {
+        ok: true,
+        config: {
+          ...config,
+          baseUrl: value,
+        },
+      }
+    case 'max-tokens':
+    case 'maxtokens': {
+      const parsed = Number.parseInt(value, 10)
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return { ok: false, message: i18n.t('cli.config.errorInvalidMaxTokens', { value }) }
+      }
+
+      return {
+        ok: true,
+        config: {
+          ...config,
+          maxTokens: parsed,
+        },
+      }
+    }
+    case 'temperature': {
+      const parsed = Number.parseFloat(value)
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 2) {
+        return { ok: false, message: i18n.t('cli.config.errorInvalidTemperature', { value }) }
+      }
+
+      return {
+        ok: true,
+        config: {
+          ...config,
+          temperature: parsed,
+        },
+      }
+    }
+    case 'timeout':
+    case 'timeout-ms':
+    case 'timeoutms': {
+      const parsed = Number.parseInt(value, 10)
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return { ok: false, message: i18n.t('cli.config.errorInvalidTimeout', { value }) }
+      }
+
+      return {
+        ok: true,
+        config: {
+          ...config,
+          timeoutMs: parsed,
+        },
+      }
+    }
+    default:
+      return { ok: false, message: i18n.t('cli.config.errorUnsupportedField', { value: field }) }
+  }
+}
+
+function clearModelConfigField(
+  config: ModelConfig,
+  field: string,
+  i18n: AppI18n,
+): { ok: true; config: ModelConfig } | { ok: false; message: string } {
+  switch (field) {
+    case 'api-key':
+    case 'apikey':
+    case 'key':
+      return {
+        ok: true,
+        config: {
+          ...config,
+          apiKey: '',
+        },
+      }
+    default:
+      return {
+        ok: false,
+        message: i18n.t('cli.config.errorUnsupportedClearField', { value: field }),
+      }
+  }
+}
+
+function isModelProvider(value: string): value is ModelProvider {
+  return (
+    value === 'openai-compatible' ||
+    value === 'openai-responses' ||
+    value === 'anthropic' ||
+    value === 'google'
+  )
 }
 
 function formatStorageUpdate(
