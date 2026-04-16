@@ -164,6 +164,7 @@ function createBootstrapSnapshot() {
       ':tools',
       ':model',
       ':config',
+      ':session',
       ':storage',
       ':storage set [path]',
       ':storage reset',
@@ -375,5 +376,39 @@ describe('ApplyCliCommandUseCase', () => {
     expect(output?.content).toContain('Saved a new storage directory')
     expect(output?.content).toContain('D:/AdnifyData')
     expect(result.statusLine).toContain('storage directory')
+  })
+
+  test('should display current session details', async () => {
+    const repo = createMockSessionRepo()
+    const session = ConversationSession.create({
+      id: 'sess-meta',
+      title: 'Current session title',
+      mode: 'plan',
+      workspacePath: 'E:/26Project/Adnify-Cli',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    })
+    session.addUserMessage('msg-1', new Date('2026-01-01T00:01:00.000Z'), 'hello')
+    await repo.save(session)
+
+    const useCase = new ApplyCliCommandUseCase(
+      repo,
+      createMockStorageSettings(),
+      createMockIdGenerator(),
+      createMockClock(new Date('2026-01-01T00:04:00.000Z')),
+      createMockLogger(),
+      createAppI18n('en'),
+    )
+
+    const result = await useCase.execute({
+      sessionId: session.id,
+      commandLine: ':session',
+      bootstrap: createBootstrapSnapshot(),
+    })
+
+    const output = parseCliTranscriptMarkup(result.session.getMessages()[2]?.content ?? '')
+    expect(output?.kind).toBe('command-output')
+    expect(output?.content).toContain('Current session:')
+    expect(output?.content).toContain('Current session title')
+    expect(output?.content).toContain('sess-meta')
   })
 })

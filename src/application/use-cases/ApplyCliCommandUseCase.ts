@@ -264,6 +264,15 @@ export class ApplyCliCommandUseCase {
         return persist(this.i18n.t('cli.config.status'))
       }
 
+      case 'session': {
+        addCommandInput()
+        addCommandOutput(formatCurrentSession(session, this.i18n), {
+          title: this.i18n.t('transcript.session'),
+          tone: 'info',
+        })
+        return persist(this.i18n.t('cli.session.status'))
+      }
+
       case 'storage': {
         addCommandInput()
         const subcommand = args[0]?.toLowerCase()
@@ -469,6 +478,19 @@ function formatStorageSnapshot(snapshot: StorageSettingsSnapshot, i18n: AppI18n)
   }
 
   return lines.join('\n')
+}
+
+function formatCurrentSession(session: ConversationSession, i18n: AppI18n): string {
+  return [
+    i18n.t('cli.session.title'),
+    i18n.t('cli.session.id', { value: session.id }),
+    i18n.t('cli.session.shortId', { value: formatShortSessionId(session.id) }),
+    i18n.t('cli.session.name', { value: session.title }),
+    i18n.t('cli.session.mode', { value: session.mode }),
+    i18n.t('cli.session.workspace', { value: session.workspacePath }),
+    i18n.t('cli.session.messageCount', { value: session.getMessages().length }),
+    i18n.t('cli.session.updatedAt', { value: session.updatedAt.toISOString() }),
+  ].join('\n')
 }
 
 function formatStorageUpdate(

@@ -13,7 +13,6 @@ import { Panel } from './Panel'
 export interface ConversationViewportProps {
   messages: ConversationMessage[]
   streamingText?: string
-  configInitPrompt?: string
   viewportRows: number
   i18n: AppI18n
 }
@@ -283,22 +282,6 @@ function buildViewportRows(
   contentWidth: number,
 ): ViewportRow[] {
   const rows: ViewportRow[] = []
-  const showConfigWizard = Boolean(props.configInitPrompt)
-
-  if (showConfigWizard) {
-    const configLines = props.configInitPrompt?.split('\n') ?? []
-
-    configLines.forEach((line, index) => {
-      rows.push({
-        kind: 'text',
-        key: `config-${index}`,
-        content: line || ' ',
-        contentColor: line.startsWith('  ') ? adnifyTheme.info : adnifyTheme.textSecondary,
-      })
-    })
-
-    return rows
-  }
 
   props.messages.forEach((message, index) => {
     appendMessageRows(rows, message, props.i18n, contentWidth)
@@ -357,7 +340,6 @@ export const ConversationViewport = memo(function ConversationViewport(
   props: ConversationViewportProps,
 ) {
   const { stdout } = useStdout()
-  const showConfigWizard = Boolean(props.configInitPrompt)
   const terminalColumns = stdout?.columns ?? 80
   const contentWidth = useMemo(
     () => Math.max(MIN_CONTENT_WIDTH, terminalColumns - PANEL_HORIZONTAL_CHROME),
@@ -365,7 +347,7 @@ export const ConversationViewport = memo(function ConversationViewport(
   )
   const viewportRows = useMemo(
     () => buildViewportRows(props, contentWidth),
-    [contentWidth, props.configInitPrompt, props.i18n, props.messages, props.streamingText],
+    [contentWidth, props.i18n, props.messages, props.streamingText],
   )
   const visibleRows = useMemo(() => {
     // 只保留尾部可见行，让长回复留在会话窗里，而不是继续把整个页面向下撑高。
@@ -388,8 +370,7 @@ export const ConversationViewport = memo(function ConversationViewport(
   return (
     <Panel
       title={props.i18n.t('conversation.panelSession')}
-      subtitle={showConfigWizard ? props.i18n.t('conversation.panelConfiguration') : undefined}
-      accent={showConfigWizard ? 'warm' : 'muted'}
+      accent="muted"
     >
       <Box height={props.viewportRows} flexDirection="column" overflowY="hidden">
         {visibleRows.map((row) => renderViewportRow(row))}

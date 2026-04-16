@@ -8,6 +8,7 @@ import { ApplyCliCommandUseCase } from '../../application/use-cases/ApplyCliComm
 import { BootstrapCliUseCase } from '../../application/use-cases/BootstrapCliUseCase'
 import { CreateSessionUseCase } from '../../application/use-cases/CreateSessionUseCase'
 import { ListSessionsUseCase } from '../../application/use-cases/ListSessionsUseCase'
+import { ResolveStartupSessionUseCase } from '../../application/use-cases/ResolveStartupSessionUseCase'
 import { SubmitPromptUseCase } from '../../application/use-cases/SubmitPromptUseCase'
 import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import { DefaultCliConfigAdapter } from '../config/DefaultCliConfigAdapter'
@@ -58,6 +59,18 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
     logger,
     i18n,
   )
+  const createSession = new CreateSessionUseCase(
+    sessionRepository,
+    idGenerator,
+    clock,
+    logger,
+    i18n,
+  )
+  const resolveStartupSession = new ResolveStartupSessionUseCase(
+    sessionRepository,
+    createSession,
+    logger,
+  )
 
   const switchModel = (providerName: string, modelName?: string): ModelConfig | null => {
     const newConfig = config.switchModel(providerName, modelName)
@@ -88,8 +101,9 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
     i18n,
     useCases: {
       bootstrapCli: new BootstrapCliUseCase(workspaceContextService, config, logger, i18n),
-      createSession: new CreateSessionUseCase(sessionRepository, idGenerator, clock, logger, i18n),
+      createSession,
       listSessions: new ListSessionsUseCase(sessionRepository),
+      resolveStartupSession,
       submitPrompt,
       applyCliCommand: new ApplyCliCommandUseCase(
         sessionRepository,

@@ -39,6 +39,7 @@ const COMMAND_DESCRIPTION_KEYS: Record<string, string> = {
   ':model [provider] [model]': 'command.desc.model',
   ':config': 'command.desc.config',
   ':config init': 'command.desc.configInit',
+  ':session': 'command.desc.session',
   ':sessions': 'command.desc.sessions',
   ':resume [index|id]': 'command.desc.resume',
   ':storage': 'command.desc.storage',
@@ -149,7 +150,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
           cwd: params.cwd,
         })
 
-        const createdSession = await params.runtime.useCases.createSession.execute({
+        const startupSession = await params.runtime.useCases.resolveStartupSession.execute({
           workspacePath: bootSnapshot.workspace.rootPath,
           mode: bootSnapshot.profile.defaultMode,
         })
@@ -159,14 +160,25 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
         }
 
         setBootstrap(bootSnapshot)
-        setSession(createdSession)
+        setSession(startupSession.session)
         await refreshRecentSessions(bootSnapshot.workspace.rootPath)
 
         if (!bootSnapshot.modelConfig.apiKey) {
-          configInit.start()
-          setStatusLine(i18n.t('status.notConfigured'))
+          setStatusLine(
+            startupSession.restored
+              ? i18n.t('status.sessionRestoredSetupRequired', {
+                  id: startupSession.session.id.slice(0, 8),
+                })
+              : i18n.t('status.notConfigured'),
+          )
         } else {
-          setStatusLine(i18n.t('status.runtimeReady'))
+          setStatusLine(
+            startupSession.restored
+              ? i18n.t('status.sessionRestored', {
+                  id: startupSession.session.id.slice(0, 8),
+                })
+              : i18n.t('status.runtimeReady'),
+          )
         }
       } catch (error) {
         if (!mounted) {
@@ -369,6 +381,12 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     }
 
     if (key.escape) {
+      if (configInit.isActive && !inputValue) {
+        configInit.stop()
+        setStatusLine(i18n.t('status.configInitCancelled'))
+        return
+      }
+
       setInputValue('')
       setSelectedSuggestionIndex(0)
       return
@@ -409,7 +427,16 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       setInputValue((previous) => previous + input)
       setSelectedSuggestionIndex(0)
     }
-  }, [applySelectedSuggestion, commandSuggestions.length, handleSubmit, isSuggestionOpen, params])
+  }, [
+    applySelectedSuggestion,
+    commandSuggestions.length,
+    configInit,
+    handleSubmit,
+    i18n,
+    inputValue,
+    isSuggestionOpen,
+    params,
+  ])
 
   return {
     bootstrap,

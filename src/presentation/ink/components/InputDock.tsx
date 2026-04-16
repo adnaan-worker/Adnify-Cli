@@ -13,6 +13,7 @@ export interface InputDockProps {
   busy: boolean
   mode: AssistantMode
   modelLabel: string
+  configInitPrompt?: string
   commandSuggestions: CommandSuggestionItem[]
   selectedSuggestionIndex: number
   isSuggestionOpen: boolean
@@ -20,9 +21,18 @@ export interface InputDockProps {
 }
 
 export const InputDock = memo(function InputDock(props: InputDockProps) {
+  const isConfigActive = Boolean(props.configInitPrompt)
+  const configPromptLines = props.configInitPrompt?.split('\n') ?? []
+
   return (
     <Panel
-      title={props.isSuggestionOpen ? props.i18n.t('input.panelCommands') : props.i18n.t('input.panelConsole')}
+      title={
+        isConfigActive
+          ? props.i18n.t('input.panelSetup')
+          : props.isSuggestionOpen
+            ? props.i18n.t('input.panelCommands')
+            : props.i18n.t('input.panelConsole')
+      }
       accent={props.busy ? 'brand' : 'muted'}
     >
       <Box width="100%" justifyContent="space-between" alignItems="center">
@@ -34,14 +44,47 @@ export const InputDock = memo(function InputDock(props: InputDockProps) {
             idleFrame="·  "
           />
           <Text color={adnifyTheme.textDim}>
-            {props.isSuggestionOpen ? '/' : props.i18n.t('input.labelInput')}
+            {isConfigActive
+              ? props.i18n.t('input.labelSetup')
+              : props.isSuggestionOpen
+                ? '/'
+                : props.i18n.t('input.labelInput')}
           </Text>
         </Box>
 
         <Text color={adnifyTheme.textDim}>
-          {props.isSuggestionOpen ? props.i18n.t('input.labelPalette') : props.mode}
+          {isConfigActive
+            ? props.i18n.t('input.labelSetupMode')
+            : props.isSuggestionOpen
+              ? props.i18n.t('input.labelPalette')
+              : props.mode}
         </Text>
       </Box>
+
+      {isConfigActive ? (
+        <Box
+          flexDirection="column"
+          marginTop={1}
+          borderStyle="round"
+          borderColor={adnifyTheme.borderMuted}
+          paddingX={1}
+        >
+          {configPromptLines.map((line, index) => (
+            <Text
+              key={`config-prompt-${index}`}
+              color={
+                line.startsWith('  ')
+                  ? adnifyTheme.info
+                  : line.toLowerCase().includes('error')
+                    ? adnifyTheme.danger
+                    : adnifyTheme.textSecondary
+              }
+            >
+              {line || ' '}
+            </Text>
+          ))}
+        </Box>
+      ) : null}
 
       <Box marginTop={1} gap={1}>
         <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.success}>{'>'}</Text>
@@ -62,6 +105,8 @@ export const InputDock = memo(function InputDock(props: InputDockProps) {
           />
           <Text color={adnifyTheme.textDim}>{props.i18n.t('input.hintSuggestions')}</Text>
         </Box>
+      ) : isConfigActive ? (
+        <Text color={adnifyTheme.textDim}>{props.i18n.t('input.hintConfigInit')}</Text>
       ) : !props.busy ? (
         <Text color={adnifyTheme.textDim}>{props.i18n.t('input.hintDefault')}</Text>
       ) : null}

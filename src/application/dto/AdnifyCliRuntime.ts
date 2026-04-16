@@ -4,6 +4,7 @@ import type { ApplyCliCommandUseCase } from '../use-cases/ApplyCliCommandUseCase
 import type { BootstrapCliUseCase } from '../use-cases/BootstrapCliUseCase'
 import type { CreateSessionUseCase } from '../use-cases/CreateSessionUseCase'
 import type { ListSessionsUseCase } from '../use-cases/ListSessionsUseCase'
+import type { ResolveStartupSessionUseCase } from '../use-cases/ResolveStartupSessionUseCase'
 import type { SubmitPromptUseCase } from '../use-cases/SubmitPromptUseCase'
 
 export interface AdnifyCliRuntime {
@@ -12,6 +13,7 @@ export interface AdnifyCliRuntime {
     bootstrapCli: BootstrapCliUseCase
     createSession: CreateSessionUseCase
     listSessions: ListSessionsUseCase
+    resolveStartupSession: ResolveStartupSessionUseCase
     submitPrompt: SubmitPromptUseCase
     applyCliCommand: ApplyCliCommandUseCase
   }

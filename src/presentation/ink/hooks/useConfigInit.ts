@@ -19,6 +19,7 @@ export interface ConfigInitState {
   promptText: string
   errorText: string
   start: () => void
+  stop: () => void
   handleInput: (input: string) => Promise<ConfigInitResult | null>
 }
 
@@ -115,6 +116,11 @@ export function useConfigInit(i18n: AppI18n): ConfigInitState {
     }
     setErrorText('')
     setStep('select-provider')
+  }, [])
+
+  const stop = useCallback(() => {
+    setErrorText('')
+    setStep('idle')
   }, [])
 
   const handleInput = useCallback(async (input: string): Promise<ConfigInitResult | null> => {
@@ -246,6 +252,7 @@ export function useConfigInit(i18n: AppI18n): ConfigInitState {
     promptText: buildPromptText(),
     errorText,
     start,
+    stop,
     handleInput,
   }
 }

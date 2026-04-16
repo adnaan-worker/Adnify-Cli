@@ -40,12 +40,17 @@ export function App(props: AppProps) {
   const showEmptyState =
     Boolean(session) &&
     messages.length === 0 &&
-    !controller.streamingText &&
-    !controller.configInitPrompt
+    !controller.streamingText
   const terminalRows = stdout?.rows ?? 30
   const viewportChromeRows = 4
   const headerRows = showEmptyState ? 0 : 7
-  const inputRows = controller.isSuggestionOpen ? 12 : controller.isBusy ? 7 : 8
+  const inputRows = controller.configInitPrompt
+    ? 14
+    : controller.isSuggestionOpen
+      ? 12
+      : controller.isBusy
+        ? 7
+        : 8
   const statusRows = controller.isBusy ? 0 : 2
   const layoutGapRows = showEmptyState ? 1 : 2
   const safetyRows = 2
@@ -157,7 +162,6 @@ export function App(props: AppProps) {
             <ConversationViewport
               messages={messages}
               streamingText={controller.streamingText}
-              configInitPrompt={controller.configInitPrompt}
               viewportRows={conversationViewportRows}
               i18n={i18n}
             />
@@ -171,6 +175,7 @@ export function App(props: AppProps) {
           busy={controller.isBusy}
           mode={controller.session.mode}
           modelLabel={modelLabel}
+          configInitPrompt={controller.configInitPrompt}
           commandSuggestions={controller.commandSuggestions}
           selectedSuggestionIndex={controller.selectedSuggestionIndex}
           isSuggestionOpen={controller.isSuggestionOpen}
