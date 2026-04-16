@@ -13,5 +13,6 @@ describe('loadPromptBundle', () => {
     expect(bundle.toolCatalog[0]?.name).toBe('Workspace Read')
     expect(bundle.localCommands).toContain(':help')
     expect(bundle.localCommands).toContain(':config init')
+    expect(bundle.localCommands).toContain(':storage')
   })
 })

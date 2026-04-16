@@ -1,6 +1,7 @@
 import type { Key } from 'ink'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BootstrapSnapshot } from '../../../application/dto/BootstrapSnapshot'
+import type { SessionListItem } from '../../../application/dto/SessionListItem'
 import type { AdnifyCliRuntime } from '../../../application/dto/AdnifyCliRuntime'
 import type { ConversationSession } from '../../../domain/session/aggregates/ConversationSession'
 import type { CommandSuggestionItem } from '../components/CommandSuggestionList'
@@ -24,6 +25,7 @@ export interface CliControllerState {
   commandSuggestions: CommandSuggestionItem[]
   selectedSuggestionIndex: number
   isSuggestionOpen: boolean
+  recentSessions: SessionListItem[]
   handleInput: (input: string, key: Key) => void
 }
 
@@ -37,6 +39,11 @@ const COMMAND_DESCRIPTION_KEYS: Record<string, string> = {
   ':model [provider] [model]': 'command.desc.model',
   ':config': 'command.desc.config',
   ':config init': 'command.desc.configInit',
+  ':sessions': 'command.desc.sessions',
+  ':resume [index|id]': 'command.desc.resume',
+  ':storage': 'command.desc.storage',
+  ':storage set [path]': 'command.desc.storage',
+  ':storage reset': 'command.desc.storage',
   ':clear': 'command.desc.clear',
   ':exit': 'command.desc.exit',
 }
@@ -55,6 +62,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
   const [isBooting, setIsBooting] = useState(true)
   const [isBusy, setIsBusy] = useState(false)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
+  const [recentSessions, setRecentSessions] = useState<SessionListItem[]>([])
 
   const busyRef = useRef(false)
   const bootKeyRef = useRef<string | null>(null)
@@ -114,6 +122,17 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     }
   }, [])
 
+  const refreshRecentSessions = useCallback(
+    async (workspacePath: string) => {
+      const sessions = await params.runtime.useCases.listSessions.execute({
+        workspacePath,
+        limit: 5,
+      })
+      setRecentSessions(sessions)
+    },
+    [params.runtime.useCases.listSessions],
+  )
+
   useEffect(() => {
     const bootKey = params.cwd
     if (bootKeyRef.current === bootKey) {
@@ -141,6 +160,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
 
         setBootstrap(bootSnapshot)
         setSession(createdSession)
+        await refreshRecentSessions(bootSnapshot.workspace.rootPath)
 
         if (!bootSnapshot.modelConfig.apiKey) {
           configInit.start()
@@ -167,7 +187,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     return () => {
       mounted = false
     }
-  }, [configInit.start, i18n, params.cwd, params.runtime])
+  }, [configInit.start, i18n, params.cwd, params.runtime, refreshRecentSessions])
 
   const commandSuggestions = useMemo<CommandSuggestionItem[]>(() => {
     if (!bootstrap) {
@@ -289,6 +309,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
 
         setSession(result.session)
         setStatusLine(result.statusLine)
+        await refreshRecentSessions(bootstrap.workspace.rootPath)
 
         if (result.shouldExit) {
           params.onExit()
@@ -317,6 +338,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       setSession(result.session)
       resetStreamingState()
       setStatusLine(result.statusLine)
+      await refreshRecentSessions(bootstrap.workspace.rootPath)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       setStatusLine(i18n.t('status.executionFailed', { message }))
@@ -406,6 +428,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     commandSuggestions,
     selectedSuggestionIndex,
     isSuggestionOpen,
+    recentSessions,
     handleInput,
   }
 }

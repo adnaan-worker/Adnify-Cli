@@ -7,6 +7,7 @@ import type { LoggerPort } from '../../application/ports/LoggerPort'
 import { ApplyCliCommandUseCase } from '../../application/use-cases/ApplyCliCommandUseCase'
 import { BootstrapCliUseCase } from '../../application/use-cases/BootstrapCliUseCase'
 import { CreateSessionUseCase } from '../../application/use-cases/CreateSessionUseCase'
+import { ListSessionsUseCase } from '../../application/use-cases/ListSessionsUseCase'
 import { SubmitPromptUseCase } from '../../application/use-cases/SubmitPromptUseCase'
 import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import { DefaultCliConfigAdapter } from '../config/DefaultCliConfigAdapter'
@@ -14,8 +15,10 @@ import { AiSdkGateway } from '../llm/AiSdkGateway'
 import { ModelAssistantResponder } from '../llm/ModelAssistantResponder'
 import { StubAssistantResponder } from '../llm/StubAssistantResponder'
 import { ConsoleLogger } from '../logging/ConsoleLogger'
-import { InMemorySessionRepository } from '../persistence/InMemorySessionRepository'
+import { FileSessionRepository } from '../persistence/FileSessionRepository'
 import { loadPromptBundle } from '../prompt/loadPromptBundle'
+import { FileStorageSettingsAdapter } from '../storage/FileStorageSettingsAdapter'
+import { resolveAppStorage } from '../storage/resolveAppStorage'
 import { CryptoIdGenerator } from '../system/CryptoIdGenerator'
 import { SystemClock } from '../system/SystemClock'
 import { LocalWorkspaceContextService } from '../workspace/LocalWorkspaceContextService'
@@ -26,7 +29,10 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
   const logger = new ConsoleLogger()
   const i18n = createAppI18n(resolveAppLocaleFromEnv())
   const config = new DefaultCliConfigAdapter()
-  const sessionRepository = new InMemorySessionRepository()
+  const storage = await resolveAppStorage()
+  const storageSettings = new FileStorageSettingsAdapter()
+  config.setStorage(storage)
+  const sessionRepository = new FileSessionRepository(storage)
   const idGenerator = new CryptoIdGenerator()
   const clock = new SystemClock()
   const workspaceContextService = new LocalWorkspaceContextService()
@@ -83,9 +89,11 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
     useCases: {
       bootstrapCli: new BootstrapCliUseCase(workspaceContextService, config, logger, i18n),
       createSession: new CreateSessionUseCase(sessionRepository, idGenerator, clock, logger, i18n),
+      listSessions: new ListSessionsUseCase(sessionRepository),
       submitPrompt,
       applyCliCommand: new ApplyCliCommandUseCase(
         sessionRepository,
+        storageSettings,
         idGenerator,
         clock,
         logger,

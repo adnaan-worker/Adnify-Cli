@@ -130,6 +130,16 @@ export class ConversationSession {
     this.props.updatedAt = changedAt
   }
 
+  renameTitle(nextTitle: string, changedAt: Date): void {
+    const normalized = nextTitle.trim()
+    if (!normalized || normalized === this.props.title) {
+      return
+    }
+
+    this.props.title = normalized
+    this.props.updatedAt = changedAt
+  }
+
   clearConversation(clearedAt: Date): void {
     this.props.messages = []
     this.props.updatedAt = clearedAt
@@ -160,4 +170,3 @@ export class ConversationSession {
     this.props.updatedAt = message.createdAt
   }
 }
-

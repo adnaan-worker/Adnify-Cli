@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import type { SessionListItem } from '../../../application/dto/SessionListItem'
 import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
 import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
@@ -19,6 +20,8 @@ export interface EmptyStateProps {
   modelLabel: string
   busy?: boolean
   commands: string[]
+  currentSessionId: string
+  recentSessions: SessionListItem[]
   i18n: AppI18n
 }
 
@@ -56,6 +59,25 @@ function QuickCommandItem(props: { command: string }) {
     <Box gap={1}>
       <Text color={adnifyTheme.brandStrong}>{'>'}</Text>
       <Text color={adnifyTheme.textPrimary}>{props.command}</Text>
+    </Box>
+  )
+}
+
+function RecentSessionItem(props: {
+  session: SessionListItem
+  isCurrent: boolean
+}) {
+  const shortId = props.session.id.slice(0, 8)
+  const color = props.isCurrent ? adnifyTheme.brand : adnifyTheme.textSecondary
+
+  return (
+    <Box gap={1}>
+      <Text color={props.isCurrent ? adnifyTheme.brandStrong : adnifyTheme.textDim}>
+        {props.isCurrent ? '*' : '-'}
+      </Text>
+      <Text color={color} wrap="truncate-end">
+        [{shortId}] {props.session.title}
+      </Text>
     </Box>
   )
 }
@@ -117,6 +139,19 @@ export const EmptyState = memo(function EmptyState(props: EmptyStateProps) {
                 <QuickCommandItem key={command} command={command} />
               ))}
             </Box>
+
+            {props.recentSessions.length > 0 ? (
+              <Box flexDirection="column" marginTop={1}>
+                <Text color={adnifyTheme.textDim}>{props.i18n.t('empty.recentSessions')}</Text>
+                {props.recentSessions.slice(0, 3).map((session) => (
+                  <RecentSessionItem
+                    key={session.id}
+                    session={session}
+                    isCurrent={session.id === props.currentSessionId}
+                  />
+                ))}
+              </Box>
+            ) : null}
           </Box>
         </Box>
       </Box>

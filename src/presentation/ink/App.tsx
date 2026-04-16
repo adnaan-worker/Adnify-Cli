@@ -133,6 +133,8 @@ export function App(props: AppProps) {
           modelLabel={modelLabel}
           busy={controller.isBusy}
           commands={readyBootstrap.localCommands}
+          currentSessionId={readySession.id}
+          recentSessions={controller.recentSessions}
           i18n={i18n}
         />
       ) : (

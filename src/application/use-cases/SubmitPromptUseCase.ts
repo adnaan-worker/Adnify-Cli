@@ -7,6 +7,7 @@ import type { IdGeneratorPort } from '../ports/IdGeneratorPort'
 import type { LoggerPort } from '../ports/LoggerPort'
 import type { SessionRepositoryPort } from '../ports/SessionRepositoryPort'
 import type { WorkspaceContextPort } from '../ports/WorkspaceContextPort'
+import { createSessionTitle } from '../support/createSessionTitle'
 
 export interface SubmitPromptCommand {
   sessionId: string
@@ -53,6 +54,7 @@ export class SubmitPromptUseCase {
     }
 
     const now = this.clock.now()
+    this.updateSessionTitleIfNeeded(session, prompt, now)
     session.addUserMessage(this.idGenerator.next(), now, prompt)
 
     const workspace = await this.workspaceContextPort.inspect(session.workspacePath)
@@ -91,6 +93,7 @@ export class SubmitPromptUseCase {
     }
 
     const now = this.clock.now()
+    this.updateSessionTitleIfNeeded(session, prompt, now)
     session.addUserMessage(this.idGenerator.next(), now, prompt)
 
     const workspace = await this.workspaceContextPort.inspect(session.workspacePath)
@@ -158,5 +161,21 @@ export class SubmitPromptUseCase {
     }
 
     return session
+  }
+
+  private updateSessionTitleIfNeeded(
+    session: ConversationSession,
+    prompt: string,
+    changedAt: Date,
+  ): void {
+    if (session.getMessages().length > 0) {
+      return
+    }
+
+    if (session.title !== this.i18n.t('session.defaultTitle')) {
+      return
+    }
+
+    session.renameTitle(createSessionTitle(prompt), changedAt)
   }
 }

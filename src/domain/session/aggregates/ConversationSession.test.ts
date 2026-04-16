@@ -38,5 +38,21 @@ describe('ConversationSession', () => {
     expect(session.id).toBe('session-2')
     expect(session.getMessages()).toHaveLength(0)
   })
-})
 
+  test('should rename title and update timestamp', () => {
+    const createdAt = new Date('2026-04-13T12:00:00.000Z')
+    const session = ConversationSession.create({
+      id: 'session-3',
+      title: 'demo',
+      mode: 'agent',
+      workspacePath: 'E:/26Project/Adnify-Cli',
+      createdAt,
+    })
+
+    const renamedAt = new Date('2026-04-13T12:03:00.000Z')
+    session.renameTitle('Fix auth token refresh loop', renamedAt)
+
+    expect(session.title).toBe('Fix auth token refresh loop')
+    expect(session.updatedAt.toISOString()).toBe(renamedAt.toISOString())
+  })
+})

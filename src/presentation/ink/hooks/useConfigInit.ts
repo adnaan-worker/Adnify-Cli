@@ -3,6 +3,7 @@ import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { ModelConfig } from '../../../domain/assistant/value-objects/ModelConfig'
 import { PROVIDER_PRESETS, type ProviderPreset } from '../../../infrastructure/config/providerPresets'
 import { writeModelConfig } from '../../../infrastructure/config/writeLocalConfig'
+import { resolveAppStorage } from '../../../infrastructure/storage/resolveAppStorage'
 
 type InitStep =
   | 'idle'
@@ -219,12 +220,13 @@ export function useConfigInit(i18n: AppI18n): ConfigInitState {
         }
 
         await writeModelConfig(config)
+        const storage = await resolveAppStorage()
         setStep('done')
 
         return {
           config,
           message: [
-            i18n.t('config.savedLine1'),
+            i18n.t('config.savedLine1').replace('~/.adnify-cli/config.json', storage.configPath),
             i18n.t('config.savedLine2', {
               model: config.model,
               baseUrl: config.baseUrl,

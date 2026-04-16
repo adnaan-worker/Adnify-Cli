@@ -1,0 +1,23 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
+
+export interface StorageSettingsFile {
+  dataDirectory?: string
+}
+
+export async function readStorageSettingsFile(path: string): Promise<StorageSettingsFile> {
+  try {
+    const raw = await readFile(path, 'utf8')
+    return JSON.parse(raw) as StorageSettingsFile
+  } catch {
+    return {}
+  }
+}
+
+export async function writeStorageSettingsFile(
+  path: string,
+  settings: StorageSettingsFile,
+): Promise<void> {
+  await mkdir(dirname(path), { recursive: true })
+  await writeFile(path, JSON.stringify(settings, null, 2) + '\n', 'utf8')
+}

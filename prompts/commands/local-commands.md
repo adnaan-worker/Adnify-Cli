@@ -11,5 +11,10 @@ These commands are handled by the CLI itself instead of being sent to the model.
 - :model [provider] [model]
 - :config
 - :config init
+- :storage
+- :storage set [path]
+- :storage reset
+- :sessions
+- :resume [index|id]
 - :clear
 - :exit

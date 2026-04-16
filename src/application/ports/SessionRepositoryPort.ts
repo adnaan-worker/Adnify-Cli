@@ -3,5 +3,6 @@ import type { ConversationSession } from '../../domain/session/aggregates/Conver
 export interface SessionRepositoryPort {
   save(session: ConversationSession): Promise<void>
   findById(sessionId: string): Promise<ConversationSession | null>
+  listByWorkspace(workspacePath: string, limit?: number): Promise<ConversationSession[]>
 }
 

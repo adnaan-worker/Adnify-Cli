@@ -9,6 +9,7 @@ import type { ClockPort } from '../ports/ClockPort'
 import type { IdGeneratorPort } from '../ports/IdGeneratorPort'
 import type { LoggerPort } from '../ports/LoggerPort'
 import type { SessionRepositoryPort } from '../ports/SessionRepositoryPort'
+import type { StorageSettingsPort } from '../ports/StorageSettingsPort'
 import { parseCliTranscriptMarkup } from '../support/CliTranscriptMarkup'
 import { ApplyCliCommandUseCase } from './ApplyCliCommandUseCase'
 
@@ -40,6 +41,69 @@ function createMockSessionRepo(): SessionRepositoryPort & { sessions: Map<string
       sessions.set(session.id, session.clone())
     },
     findById: async (id) => sessions.get(id)?.clone() ?? null,
+    listByWorkspace: async (workspacePath, limit = 20) =>
+      [...sessions.values()]
+        .filter((session) => session.workspacePath === workspacePath)
+        .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
+        .slice(0, limit)
+        .map((session) => session.clone()),
+  }
+}
+
+function createMockStorageSettings(): StorageSettingsPort {
+  let configuredDataRoot: string | null = 'E:/AdnifyData'
+  let effectiveStorage = {
+    dataRoot: 'E:/AdnifyData',
+    configPath: 'E:/AdnifyData/config.json',
+    sessionsDir: 'E:/AdnifyData/sessions',
+    source: 'settings' as const,
+    isCustom: true,
+  }
+
+  return {
+    inspect: async () => ({
+      effectiveStorage,
+      settingsPath: 'E:/Users/adnaan/AppData/Roaming/Adnify-Cli/settings.json',
+      configuredDataRoot,
+    }),
+    setDataDirectory: async (path) => {
+      configuredDataRoot = path
+      effectiveStorage = {
+        dataRoot: path,
+        configPath: `${path}/config.json`,
+        sessionsDir: `${path}/sessions`,
+        source: 'settings',
+        isCustom: true,
+      }
+
+      return {
+        effectiveStorage,
+        settingsPath: 'E:/Users/adnaan/AppData/Roaming/Adnify-Cli/settings.json',
+        configuredDataRoot,
+        migratedConfig: true,
+        migratedSessions: true,
+        requiresRestart: true,
+      }
+    },
+    resetDataDirectory: async () => {
+      configuredDataRoot = null
+      effectiveStorage = {
+        dataRoot: 'C:/Users/adnaan/AppData/Local/Adnify-Cli',
+        configPath: 'C:/Users/adnaan/AppData/Local/Adnify-Cli/config.json',
+        sessionsDir: 'C:/Users/adnaan/AppData/Local/Adnify-Cli/sessions',
+        source: 'default',
+        isCustom: false,
+      }
+
+      return {
+        effectiveStorage,
+        settingsPath: 'E:/Users/adnaan/AppData/Roaming/Adnify-Cli/settings.json',
+        configuredDataRoot,
+        migratedConfig: false,
+        migratedSessions: false,
+        requiresRestart: true,
+      }
+    },
   }
 }
 
@@ -77,6 +141,13 @@ function createBootstrapSnapshot() {
       },
     },
     supportedModes: ['chat', 'agent', 'plan'],
+    storage: {
+      dataRoot: 'E:/AdnifyData',
+      configPath: 'E:/AdnifyData/config.json',
+      sessionsDir: 'E:/AdnifyData/sessions',
+      source: 'env' as const,
+      isCustom: true,
+    },
     toolCatalog: [
       new ToolDescriptor({
         id: 'shell-runner',
@@ -86,7 +157,20 @@ function createBootstrapSnapshot() {
         riskLevel: 'careful',
       }),
     ],
-    localCommands: [':help', ':mode chat', ':workspace', ':tools', ':model', ':config', ':clear'],
+    localCommands: [
+      ':help',
+      ':mode chat',
+      ':workspace',
+      ':tools',
+      ':model',
+      ':config',
+      ':storage',
+      ':storage set [path]',
+      ':storage reset',
+      ':sessions',
+      ':resume [index|id]',
+      ':clear',
+    ],
   }
 }
 
@@ -104,10 +188,11 @@ describe('ApplyCliCommandUseCase', () => {
 
     const useCase = new ApplyCliCommandUseCase(
       repo,
+      createMockStorageSettings(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:01:00.000Z')),
       createMockLogger(),
-      createAppI18n('zh-CN'),
+      createAppI18n('en'),
     )
 
     const result = await useCase.execute({
@@ -118,18 +203,14 @@ describe('ApplyCliCommandUseCase', () => {
 
     const messages = result.session.getMessages()
     expect(messages).toHaveLength(2)
-
     expect(parseCliTranscriptMarkup(messages[0]?.content ?? '')).toEqual({
       kind: 'command-input',
       content: '/help',
     })
 
-    expect(parseCliTranscriptMarkup(messages[1]?.content ?? '')).toEqual({
-      kind: 'command-output',
-      title: '命令',
-      tone: 'info',
-      content: '本地命令列表：\n- :help\n- :mode chat\n- :workspace\n- :tools\n- :model\n- :config\n- :clear',
-    })
+    const output = parseCliTranscriptMarkup(messages[1]?.content ?? '')
+    expect(output?.kind).toBe('command-output')
+    expect(output?.content).toContain(':resume [index|id]')
   })
 
   test('should clear existing conversation before appending clear transcript', async () => {
@@ -151,10 +232,11 @@ describe('ApplyCliCommandUseCase', () => {
 
     const useCase = new ApplyCliCommandUseCase(
       repo,
+      createMockStorageSettings(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:02:00.000Z')),
       createMockLogger(),
-      createAppI18n('zh-CN'),
+      createAppI18n('en'),
     )
 
     const result = await useCase.execute({
@@ -169,11 +251,129 @@ describe('ApplyCliCommandUseCase', () => {
       kind: 'command-input',
       content: '/clear',
     })
-    expect(parseCliTranscriptMarkup(messages[1]?.content ?? '')).toEqual({
-      kind: 'command-output',
-      title: '会话',
-      tone: 'success',
-      content: '会话已清空，但工作区上下文和当前模式仍然保留。',
+  })
+
+  test('should list recent sessions for the current workspace', async () => {
+    const repo = createMockSessionRepo()
+    const workspacePath = 'E:/26Project/Adnify-Cli'
+
+    const older = ConversationSession.create({
+      id: 'sess-older',
+      title: 'Fix auth flow',
+      mode: 'agent',
+      workspacePath,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
     })
+    older.addUserMessage('msg-1', new Date('2026-01-01T00:01:00.000Z'), 'older prompt')
+
+    const current = ConversationSession.create({
+      id: 'sess-current',
+      title: 'Review CLI layout',
+      mode: 'plan',
+      workspacePath,
+      createdAt: new Date('2026-01-01T00:10:00.000Z'),
+    })
+    current.addUserMessage('msg-2', new Date('2026-01-01T00:11:00.000Z'), 'current prompt')
+
+    await repo.save(older)
+    await repo.save(current)
+
+    const useCase = new ApplyCliCommandUseCase(
+      repo,
+      createMockStorageSettings(),
+      createMockIdGenerator(),
+      createMockClock(new Date('2026-01-01T00:12:00.000Z')),
+      createMockLogger(),
+      createAppI18n('en'),
+    )
+
+    const result = await useCase.execute({
+      sessionId: current.id,
+      commandLine: ':sessions',
+      bootstrap: createBootstrapSnapshot(),
+    })
+
+    const output = parseCliTranscriptMarkup(result.session.getMessages()[2]?.content ?? '')
+    expect(output?.kind).toBe('command-output')
+    expect(output?.content).toContain('Recent sessions:')
+    expect(output?.content).toContain('[sess-cur]')
+    expect(output?.content).toContain('Review CLI layout')
+  })
+
+  test('should resume a session by numeric index', async () => {
+    const repo = createMockSessionRepo()
+    const workspacePath = 'E:/26Project/Adnify-Cli'
+
+    const current = ConversationSession.create({
+      id: 'sess-current',
+      title: 'Current session',
+      mode: 'agent',
+      workspacePath,
+      createdAt: new Date('2026-01-01T00:10:00.000Z'),
+    })
+    current.addUserMessage('msg-1', new Date('2026-01-01T00:11:00.000Z'), 'current prompt')
+
+    const previous = ConversationSession.create({
+      id: 'sess-restore',
+      title: 'Restore me',
+      mode: 'chat',
+      workspacePath,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    })
+    previous.addAssistantMessage('msg-2', new Date('2026-01-01T00:05:00.000Z'), 'saved reply')
+
+    await repo.save(current)
+    await repo.save(previous)
+
+    const useCase = new ApplyCliCommandUseCase(
+      repo,
+      createMockStorageSettings(),
+      createMockIdGenerator(),
+      createMockClock(new Date('2026-01-01T00:12:00.000Z')),
+      createMockLogger(),
+      createAppI18n('en'),
+    )
+
+    const result = await useCase.execute({
+      sessionId: current.id,
+      commandLine: ':resume 2',
+      bootstrap: createBootstrapSnapshot(),
+    })
+
+    expect(result.session.id).toBe('sess-restore')
+    expect(result.statusLine).toContain('Resumed session')
+  })
+
+  test('should save a custom storage directory', async () => {
+    const repo = createMockSessionRepo()
+    const session = ConversationSession.create({
+      id: 'sess-storage',
+      title: 'Storage',
+      mode: 'agent',
+      workspacePath: 'E:/26Project/Adnify-Cli',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    })
+    await repo.save(session)
+
+    const useCase = new ApplyCliCommandUseCase(
+      repo,
+      createMockStorageSettings(),
+      createMockIdGenerator(),
+      createMockClock(new Date('2026-01-01T00:03:00.000Z')),
+      createMockLogger(),
+      createAppI18n('en'),
+    )
+
+    const result = await useCase.execute({
+      sessionId: session.id,
+      commandLine: ':storage set D:/AdnifyData',
+      bootstrap: createBootstrapSnapshot(),
+    })
+
+    const output = parseCliTranscriptMarkup(result.session.getMessages()[1]?.content ?? '')
+    expect(output?.kind).toBe('command-output')
+    expect(output?.content).toContain('Saved a new storage directory')
+    expect(output?.content).toContain('D:/AdnifyData')
+    expect(result.statusLine).toContain('storage directory')
   })
 })

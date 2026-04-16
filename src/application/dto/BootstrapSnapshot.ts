@@ -1,3 +1,4 @@
+import type { AppStorageSnapshot } from './AppStorageSnapshot'
 import type { AssistantProfile } from '../../domain/assistant/entities/AssistantProfile'
 import type { AssistantMode } from '../../domain/assistant/value-objects/AssistantMode'
 import type { ModelConfig, ProvidersMap } from '../../domain/assistant/value-objects/ModelConfig'
@@ -16,4 +17,5 @@ export interface BootstrapSnapshot {
   supportedModes: AssistantMode[]
   toolCatalog: ToolDescriptor[]
   localCommands: string[]
+  storage: AppStorageSnapshot
 }

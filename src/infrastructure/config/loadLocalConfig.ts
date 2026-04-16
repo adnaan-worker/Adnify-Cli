@@ -1,9 +1,17 @@
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { homedir } from 'node:os'
-import type { ModelConfig, ModelProvider, ProvidersMap } from '../../domain/assistant/value-objects/ModelConfig'
+import type {
+  ModelConfig,
+  ModelProvider,
+  ProvidersMap,
+} from '../../domain/assistant/value-objects/ModelConfig'
+import { resolveAppStorage } from '../storage/resolveAppStorage'
 
-const VALID_PROVIDERS = new Set<ModelProvider>(['openai-compatible', 'openai-responses', 'anthropic', 'google'])
+const VALID_PROVIDERS = new Set<ModelProvider>([
+  'openai-compatible',
+  'openai-responses',
+  'anthropic',
+  'google',
+])
 
 interface RawConfigFile {
   model?: {
@@ -15,16 +23,16 @@ interface RawConfigFile {
     temperature?: number
     timeoutMs?: number
   }
-  providers?: Record<string, {
-    provider?: string
-    apiKey?: string
-    baseUrl?: string
-    models?: string[]
-  }>
+  providers?: Record<
+    string,
+    {
+      provider?: string
+      apiKey?: string
+      baseUrl?: string
+      models?: string[]
+    }
+  >
 }
-
-const CONFIG_DIR = join(homedir(), '.adnify-cli')
-const CONFIG_PATH = join(CONFIG_DIR, 'config.json')
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = {
   provider: 'openai-compatible',
@@ -37,23 +45,24 @@ const DEFAULT_MODEL_CONFIG: ModelConfig = {
 }
 
 function parseProvider(value: string | undefined): ModelProvider {
-  if (value && VALID_PROVIDERS.has(value as ModelProvider)) return value as ModelProvider
+  if (value && VALID_PROVIDERS.has(value as ModelProvider)) {
+    return value as ModelProvider
+  }
+
   return 'openai-compatible'
 }
 
 async function readConfigFile(): Promise<RawConfigFile> {
+  const storage = await resolveAppStorage()
+
   try {
-    const raw = await readFile(CONFIG_PATH, 'utf-8')
+    const raw = await readFile(storage.configPath, 'utf-8')
     return JSON.parse(raw) as RawConfigFile
   } catch {
     return {}
   }
 }
 
-/**
- * 从 ~/.adnify-cli/config.json 和环境变量加载模型配置。
- * 优先级：环境变量 > 配置文件 > 内置默认值。
- */
 export async function loadModelConfig(): Promise<ModelConfig> {
   const fileConfig = await readConfigFile()
   const model = fileConfig.model ?? {}
@@ -69,9 +78,6 @@ export async function loadModelConfig(): Promise<ModelConfig> {
   }
 }
 
-/**
- * 加载 providers 配置，用于运行时切换模型。
- */
 export async function loadProviders(): Promise<ProvidersMap> {
   const fileConfig = await readConfigFile()
   const raw = fileConfig.providers ?? {}

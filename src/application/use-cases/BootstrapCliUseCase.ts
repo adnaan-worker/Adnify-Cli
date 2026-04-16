@@ -33,6 +33,7 @@ export class BootstrapCliUseCase {
       providers: this.config.getProviders(),
       toolCatalog: this.config.getToolCatalog(),
       localCommands: this.config.getLocalCommands(),
+      storage: this.config.getStorage(),
       supportedModes: [...ASSISTANT_MODES],
     }
   }

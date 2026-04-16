@@ -1,4 +1,5 @@
 import type { AssistantPromptSet } from '../../application/dto/AssistantPromptSet'
+import type { AppStorageSnapshot } from '../../application/dto/AppStorageSnapshot'
 import type { CliConfigPort } from '../../application/ports/CliConfigPort'
 import type { AssistantProfile } from '../../domain/assistant/entities/AssistantProfile'
 import type { ModelConfig, ProvidersMap } from '../../domain/assistant/value-objects/ModelConfig'
@@ -9,6 +10,7 @@ export class DefaultCliConfigAdapter implements CliConfigPort {
   private modelConfig: ModelConfig | null = null
   private providers: ProvidersMap = {}
   private promptBundle: PromptBundle | null = null
+  private storage: AppStorageSnapshot | null = null
 
   setPromptBundle(bundle: PromptBundle): void {
     this.promptBundle = bundle
@@ -20,6 +22,10 @@ export class DefaultCliConfigAdapter implements CliConfigPort {
 
   setProviders(providers: ProvidersMap): void {
     this.providers = providers
+  }
+
+  setStorage(storage: AppStorageSnapshot): void {
+    this.storage = storage
   }
 
   getAssistantProfile(): AssistantProfile {
@@ -73,6 +79,14 @@ export class DefaultCliConfigAdapter implements CliConfigPort {
 
   getLocalCommands(): string[] {
     return this.getPromptBundle().localCommands
+  }
+
+  getStorage(): AppStorageSnapshot {
+    if (!this.storage) {
+      throw new Error('AppStorage not loaded yet. Call setStorage() during bootstrap.')
+    }
+
+    return this.storage
   }
 
   private getPromptBundle(): PromptBundle {
