@@ -54,6 +54,20 @@ const COMMAND_DESCRIPTION_KEYS: Record<string, string> = {
   ':exit': 'command.desc.exit',
 }
 
+const MAX_INPUT_HISTORY = 50
+
+function isAbortLikeError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  return (
+    error.name === 'AbortError' ||
+    error.message === 'user-abort' ||
+    error.message === 'Request aborted'
+  )
+}
+
 /**
  * Ink 展示层状态桥。
  * 这里负责把用户输入翻译成用例调用，不直接承载领域规则。
@@ -69,9 +83,14 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
   const [isBusy, setIsBusy] = useState(false)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
   const [recentSessions, setRecentSessions] = useState<SessionListItem[]>([])
+  const [isSuggestionDismissed, setIsSuggestionDismissed] = useState(false)
+  const [inputHistory, setInputHistory] = useState<string[]>([])
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null)
 
   const busyRef = useRef(false)
+  const activeAbortControllerRef = useRef<AbortController | null>(null)
   const bootKeyRef = useRef<string | null>(null)
+  const draftInputRef = useRef('')
   const streamingBufferRef = useRef('')
   const streamingFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const configInit = useConfigInit(i18n)
@@ -230,7 +249,8 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       .filter((item) => item.command.toLowerCase().startsWith(keyword))
   }, [bootstrap, i18n, inputValue])
 
-  const isSuggestionOpen = commandSuggestions.length > 0 && !configInit.isActive
+  const isSuggestionOpen =
+    commandSuggestions.length > 0 && !configInit.isActive && !isSuggestionDismissed
 
   useEffect(() => {
     if (selectedSuggestionIndex >= commandSuggestions.length) {
@@ -246,8 +266,73 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
 
     setInputValue(`${next.command} `)
     setSelectedSuggestionIndex(0)
+    setIsSuggestionDismissed(false)
+    setHistoryIndex(null)
+    draftInputRef.current = ''
     return true
   }, [commandSuggestions, selectedSuggestionIndex])
+
+  const commitInputHistory = useCallback((value: string) => {
+    const normalized = value.trim()
+    if (!normalized) {
+      return
+    }
+
+    setInputHistory((previous) => {
+      if (previous[previous.length - 1] === normalized) {
+        return previous
+      }
+
+      const next = [...previous, normalized]
+      return next.length > MAX_INPUT_HISTORY ? next.slice(next.length - MAX_INPUT_HISTORY) : next
+    })
+  }, [])
+
+  const exitHistoryNavigation = useCallback((restoreDraft: boolean) => {
+    setHistoryIndex(null)
+    if (restoreDraft) {
+      setInputValue(draftInputRef.current)
+    }
+    draftInputRef.current = ''
+  }, [])
+
+  const navigateHistory = useCallback(
+    (direction: 'older' | 'newer') => {
+      if (inputHistory.length === 0) {
+        return false
+      }
+
+      if (historyIndex === null) {
+        if (direction === 'newer') {
+          return false
+        }
+
+        draftInputRef.current = inputValue
+        const nextIndex = inputHistory.length - 1
+        setHistoryIndex(nextIndex)
+        setInputValue(inputHistory[nextIndex] ?? '')
+        return true
+      }
+
+      if (direction === 'older') {
+        const nextIndex = Math.max(0, historyIndex - 1)
+        setHistoryIndex(nextIndex)
+        setInputValue(inputHistory[nextIndex] ?? '')
+        return true
+      }
+
+      if (historyIndex >= inputHistory.length - 1) {
+        exitHistoryNavigation(true)
+        return true
+      }
+
+      const nextIndex = historyIndex + 1
+      setHistoryIndex(nextIndex)
+      setInputValue(inputHistory[nextIndex] ?? '')
+      return true
+    },
+    [exitHistoryNavigation, historyIndex, inputHistory, inputValue],
+  )
 
   const handleSubmit = useCallback(async () => {
     if (!session || !bootstrap || busyRef.current) {
@@ -255,16 +340,6 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     }
 
     let nextInput = inputValue.trim()
-
-    if ((nextInput.startsWith(':') || nextInput.startsWith('/')) && isSuggestionOpen) {
-      const selected = commandSuggestions[selectedSuggestionIndex]
-      if (selected) {
-        const normalizedTyped = nextInput.startsWith('/') ? `:${nextInput.slice(1)}` : nextInput
-        if (selected.command.startsWith(normalizedTyped)) {
-          nextInput = selected.command
-        }
-      }
-    }
 
     if (nextInput.startsWith('/')) {
       nextInput = `:${nextInput.slice(1)}`
@@ -296,10 +371,16 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       return
     }
 
+    commitInputHistory(nextInput)
     busyRef.current = true
     setIsBusy(true)
     setInputValue('')
     setSelectedSuggestionIndex(0)
+    setIsSuggestionDismissed(false)
+    setHistoryIndex(null)
+    draftInputRef.current = ''
+    const abortController = new AbortController()
+    activeAbortControllerRef.current = abortController
 
     try {
       if (nextInput === ':config init') {
@@ -346,7 +427,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       resetStreamingState()
 
       const result = await params.runtime.useCases.submitPrompt.executeStreaming(
-        { sessionId: session.id, prompt: nextInput },
+        { sessionId: session.id, prompt: nextInput, abortSignal: abortController.signal },
         {
           onChunk: (delta) => {
             queueStreamingChunk(delta)
@@ -356,7 +437,11 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
           },
           onError: (error) => {
             flushStreamingBuffer()
-            setStatusLine(i18n.t('status.responseFailed', { message: error.message }))
+            setStatusLine(
+              isAbortLikeError(error)
+                ? i18n.t('status.executionAborted')
+                : i18n.t('status.responseFailed', { message: error.message }),
+            )
           },
         },
       )
@@ -366,10 +451,15 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       setStatusLine(result.statusLine)
       await refreshRecentSessions(bootstrap.workspace.rootPath)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      setStatusLine(i18n.t('status.executionFailed', { message }))
+      if (isAbortLikeError(error)) {
+        setStatusLine(i18n.t('status.executionAborted'))
+      } else {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        setStatusLine(i18n.t('status.executionFailed', { message }))
+      }
       resetStreamingState()
     } finally {
+      activeAbortControllerRef.current = null
       busyRef.current = false
       setIsBusy(false)
     }
@@ -395,15 +485,53 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     }
 
     if (key.escape) {
+      if (busyRef.current) {
+        if (activeAbortControllerRef.current) {
+          activeAbortControllerRef.current.abort(new Error('user-abort'))
+          setStatusLine(i18n.t('status.executionAborting'))
+        }
+        return
+      }
+
       if (configInit.isActive && !inputValue) {
         configInit.stop()
         setStatusLine(i18n.t('status.configInitCancelled'))
         return
       }
 
-      setInputValue('')
-      setSelectedSuggestionIndex(0)
+      if (isSuggestionOpen) {
+        setIsSuggestionDismissed(true)
+        setSelectedSuggestionIndex(0)
+        return
+      }
+
+      if (historyIndex !== null) {
+        exitHistoryNavigation(true)
+        return
+      }
+
+      if (inputValue) {
+        setInputValue('')
+        setSelectedSuggestionIndex(0)
+      }
       return
+    }
+
+    if (!isSuggestionOpen && !configInit.isActive && key.upArrow && !inputValue) {
+      if (navigateHistory('older')) {
+        return
+      }
+    }
+
+    if (
+      !isSuggestionOpen &&
+      !configInit.isActive &&
+      key.downArrow &&
+      (!inputValue || historyIndex !== null)
+    ) {
+      if (navigateHistory('newer')) {
+        return
+      }
     }
 
     if (isSuggestionOpen && key.upArrow) {
@@ -426,18 +554,34 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
       }
     }
 
+    if (isSuggestionOpen && key.return) {
+      if (applySelectedSuggestion()) {
+        return
+      }
+    }
+
     if (key.return) {
       void handleSubmit()
       return
     }
 
     if (key.backspace || key.delete) {
+      if (historyIndex !== null) {
+        setHistoryIndex(null)
+        draftInputRef.current = ''
+      }
+      setIsSuggestionDismissed(false)
       setInputValue((previous) => previous.slice(0, -1))
       setSelectedSuggestionIndex(0)
       return
     }
 
     if (!key.ctrl && !key.meta) {
+      if (historyIndex !== null) {
+        setHistoryIndex(null)
+        draftInputRef.current = ''
+      }
+      setIsSuggestionDismissed(false)
       setInputValue((previous) => previous + input)
       setSelectedSuggestionIndex(0)
     }
@@ -446,10 +590,13 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     commandSuggestions.length,
     configInit,
     handleSubmit,
+    historyIndex,
     i18n,
     inputValue,
     isSuggestionOpen,
+    navigateHistory,
     params,
+    exitHistoryNavigation,
   ])
 
   return {

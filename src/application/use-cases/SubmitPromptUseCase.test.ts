@@ -84,6 +84,13 @@ function createMockConfig(): CliConfigPort {
     switchModel: () => null,
     getToolCatalog: () => [],
     getLocalCommands: () => [],
+    getStorage: () => ({
+      dataRoot: '/tmp/adnify',
+      configPath: '/tmp/adnify/config.json',
+      sessionsDir: '/tmp/adnify/sessions',
+      source: 'default',
+      isCustom: false,
+    }),
   }
 }
 
@@ -123,21 +130,21 @@ describe('SubmitPromptUseCase', () => {
     const useCase = new SubmitPromptUseCase(
       repo,
       createMockWorkspace(),
-      createMockResponder('回复内容'),
+      createMockResponder('reply content'),
       createMockConfig(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:01:00Z')),
       createMockLogger(),
-      createAppI18n('zh-CN'),
+      createAppI18n('en'),
     )
 
-    const result = await useCase.execute({ sessionId: 'sess-1', prompt: '你好' })
+    const result = await useCase.execute({ sessionId: 'sess-1', prompt: 'hello' })
 
     expect(result.session.getMessages()).toHaveLength(2)
     expect(result.session.getMessages()[0]?.role).toBe('user')
-    expect(result.session.getMessages()[0]?.content).toBe('你好')
+    expect(result.session.getMessages()[0]?.content).toBe('hello')
     expect(result.session.getMessages()[1]?.role).toBe('assistant')
-    expect(result.session.getMessages()[1]?.content).toBe('回复内容')
+    expect(result.session.getMessages()[1]?.content).toBe('reply content')
   })
 
   test('execute should ignore empty prompt', async () => {
@@ -154,17 +161,17 @@ describe('SubmitPromptUseCase', () => {
     const useCase = new SubmitPromptUseCase(
       repo,
       createMockWorkspace(),
-      createMockResponder('不会被调用'),
+      createMockResponder('unused'),
       createMockConfig(),
       createMockIdGenerator(),
       createMockClock(new Date()),
       createMockLogger(),
-      createAppI18n('zh-CN'),
+      createAppI18n('en'),
     )
 
     const result = await useCase.execute({ sessionId: 'sess-2', prompt: '   ' })
 
-    expect(result.statusLine).toBe('输入为空，已忽略。')
+    expect(result.statusLine).toBe('Empty input ignored.')
     expect(result.session.getMessages()).toHaveLength(0)
   })
 
@@ -179,7 +186,7 @@ describe('SubmitPromptUseCase', () => {
       createMockIdGenerator(),
       createMockClock(new Date()),
       createMockLogger(),
-      createAppI18n('zh-CN'),
+      createAppI18n('en'),
     )
 
     expect(useCase.execute({ sessionId: 'not-exist', prompt: 'hello' })).rejects.toThrow(
@@ -201,19 +208,19 @@ describe('SubmitPromptUseCase', () => {
     const useCase = new SubmitPromptUseCase(
       repo,
       createMockWorkspace(),
-      createMockResponder('流式回复'),
+      createMockResponder('stream reply'),
       createMockConfig(),
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:01:00Z')),
       createMockLogger(),
-      createAppI18n('zh-CN'),
+      createAppI18n('en'),
     )
 
     const chunks: string[] = []
     let doneContent = ''
 
     const result = await useCase.executeStreaming(
-      { sessionId: 'sess-3', prompt: '测试流式' },
+      { sessionId: 'sess-3', prompt: 'test stream' },
       {
         onChunk: (delta) => chunks.push(delta),
         onDone: (full) => {
@@ -223,10 +230,10 @@ describe('SubmitPromptUseCase', () => {
       },
     )
 
-    expect(chunks).toEqual(['流式回复'])
-    expect(doneContent).toBe('流式回复')
+    expect(chunks).toEqual(['stream reply'])
+    expect(doneContent).toBe('stream reply')
     expect(result.session.getMessages()).toHaveLength(2)
-    expect(result.session.getMessages()[1]?.content).toBe('流式回复')
+    expect(result.session.getMessages()[1]?.content).toBe('stream reply')
   })
 
   test('executeStreaming should handle errors gracefully', async () => {
@@ -243,8 +250,8 @@ describe('SubmitPromptUseCase', () => {
     const errorResponder: AssistantResponderPort = {
       generateReply: async () => ({ content: '' }),
       async *streamReply() {
-        yield { delta: '部分', done: false }
-        throw new Error('网络中断')
+        yield { delta: 'partial', done: false }
+        throw new Error('network interrupted')
       },
     }
 
@@ -256,13 +263,13 @@ describe('SubmitPromptUseCase', () => {
       createMockIdGenerator(),
       createMockClock(new Date('2026-01-01T00:01:00Z')),
       createMockLogger(),
-      createAppI18n('zh-CN'),
+      createAppI18n('en'),
     )
 
     let errorMsg = ''
 
     const result = await useCase.executeStreaming(
-      { sessionId: 'sess-4', prompt: '会失败的请求' },
+      { sessionId: 'sess-4', prompt: 'failing request' },
       {
         onChunk: () => {},
         onDone: () => {},
@@ -272,11 +279,67 @@ describe('SubmitPromptUseCase', () => {
       },
     )
 
-    expect(errorMsg).toBe('网络中断')
-    expect(result.statusLine).toContain('网络中断')
+    expect(errorMsg).toBe('network interrupted')
+    expect(result.statusLine).toContain('network interrupted')
     const messages = result.session.getMessages()
     const lastMsg = messages[messages.length - 1]
-    expect(lastMsg?.content).toContain('部分')
-    expect(lastMsg?.content).toContain('[响应中断]')
+    expect(lastMsg?.content).toContain('partial')
+    expect(lastMsg?.content).toContain('[Response interrupted]')
+  })
+
+  test('executeStreaming should stop cleanly when aborted', async () => {
+    const repo = createMockSessionRepo()
+    const session = ConversationSession.create({
+      id: 'sess-5',
+      title: 'test',
+      mode: 'agent',
+      workspacePath: '/test',
+      createdAt: new Date('2026-01-01'),
+    })
+    await repo.save(session)
+
+    const abortAwareResponder: AssistantResponderPort = {
+      generateReply: async () => ({ content: '' }),
+      async *streamReply(command) {
+        yield { delta: 'partial ', done: false }
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        if (command.abortSignal?.aborted) {
+          throw new Error('Request aborted')
+        }
+        yield { delta: 'tail', done: true }
+      },
+    }
+
+    const useCase = new SubmitPromptUseCase(
+      repo,
+      createMockWorkspace(),
+      abortAwareResponder,
+      createMockConfig(),
+      createMockIdGenerator(),
+      createMockClock(new Date('2026-01-01T00:01:00Z')),
+      createMockLogger(),
+      createAppI18n('en'),
+    )
+
+    const controller = new AbortController()
+    let firstChunk = true
+
+    const result = await useCase.executeStreaming(
+      { sessionId: 'sess-5', prompt: 'abort me', abortSignal: controller.signal },
+      {
+        onChunk: () => {
+          if (firstChunk) {
+            firstChunk = false
+            controller.abort(new Error('user-abort'))
+          }
+        },
+        onDone: () => {},
+        onError: () => {},
+      },
+    )
+
+    expect(result.statusLine).toBe('Current execution aborted.')
+    const messages = result.session.getMessages()
+    expect(messages[messages.length - 1]?.content).toContain('partial')
   })
 })

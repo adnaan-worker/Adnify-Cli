@@ -51,7 +51,10 @@ export class AiSdkGateway implements ModelGatewayPort {
 
   async *streamChat(request: ModelRequest): AsyncIterable<ModelStreamChunk> {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs)
+    const timeout = setTimeout(() => controller.abort(new Error('timeout')), this.config.timeoutMs)
+    const forwardAbort = () => controller.abort(request.abortSignal?.reason ?? new Error('aborted'))
+
+    request.abortSignal?.addEventListener('abort', forwardAbort)
 
     try {
       const result = streamText({
@@ -69,6 +72,9 @@ export class AiSdkGateway implements ModelGatewayPort {
       yield { delta: '', finishReason: 'stop' }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
+        if (request.abortSignal?.aborted) {
+          throw new Error('Request aborted')
+        }
         throw new Error(`Model API timeout after ${this.config.timeoutMs}ms`)
       }
 
@@ -77,6 +83,7 @@ export class AiSdkGateway implements ModelGatewayPort {
       throw error
     } finally {
       clearTimeout(timeout)
+      request.abortSignal?.removeEventListener('abort', forwardAbort)
     }
   }
 }

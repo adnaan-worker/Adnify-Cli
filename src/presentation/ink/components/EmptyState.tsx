@@ -6,6 +6,7 @@ import type { PackageManagerName } from '../../../domain/workspace/entities/Work
 import { memo } from 'react'
 import { adnifyTheme } from '../theme'
 import { Panel } from './Panel'
+import { RecentSessionsList } from './RecentSessionsList'
 import { Wordmark } from './Wordmark'
 
 export interface EmptyStateProps {
@@ -59,25 +60,6 @@ function QuickCommandItem(props: { command: string }) {
     <Box gap={1}>
       <Text color={adnifyTheme.brandStrong}>{'>'}</Text>
       <Text color={adnifyTheme.textPrimary}>{props.command}</Text>
-    </Box>
-  )
-}
-
-function RecentSessionItem(props: {
-  session: SessionListItem
-  isCurrent: boolean
-}) {
-  const shortId = props.session.id.slice(0, 8)
-  const color = props.isCurrent ? adnifyTheme.brand : adnifyTheme.textSecondary
-
-  return (
-    <Box gap={1}>
-      <Text color={props.isCurrent ? adnifyTheme.brandStrong : adnifyTheme.textDim}>
-        {props.isCurrent ? '*' : '-'}
-      </Text>
-      <Text color={color} wrap="truncate-end">
-        [{shortId}] {props.session.title}
-      </Text>
     </Box>
   )
 }
@@ -140,18 +122,13 @@ export const EmptyState = memo(function EmptyState(props: EmptyStateProps) {
               ))}
             </Box>
 
-            {props.recentSessions.length > 0 ? (
-              <Box flexDirection="column" marginTop={1}>
-                <Text color={adnifyTheme.textDim}>{props.i18n.t('empty.recentSessions')}</Text>
-                {props.recentSessions.slice(0, 3).map((session) => (
-                  <RecentSessionItem
-                    key={session.id}
-                    session={session}
-                    isCurrent={session.id === props.currentSessionId}
-                  />
-                ))}
-              </Box>
-            ) : null}
+            <RecentSessionsList
+              sessions={props.recentSessions}
+              currentSessionId={props.currentSessionId}
+              i18n={props.i18n}
+              layout="stack"
+              limit={3}
+            />
           </Box>
         </Box>
       </Box>

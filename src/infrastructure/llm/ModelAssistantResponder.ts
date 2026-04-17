@@ -51,6 +51,7 @@ export class ModelAssistantResponder implements AssistantResponderPort {
         model: this.config.model,
         temperature: this.config.temperature,
         maxTokens: this.config.maxTokens,
+        abortSignal: command.abortSignal,
       })) {
         yield {
           delta: chunk.delta,

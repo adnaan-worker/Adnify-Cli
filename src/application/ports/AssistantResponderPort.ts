@@ -16,6 +16,7 @@ export interface AssistantResponderCommand {
   session: ConversationSession
   workspace: WorkspaceContext
   toolCatalog: ToolDescriptor[]
+  abortSignal?: AbortSignal
 }
 
 /**

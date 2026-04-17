@@ -329,16 +329,16 @@ export class ApplyCliCommandUseCase {
 
         const configText = [
           this.i18n.t('cli.config.title'),
-          this.i18n.t('cli.config.provider', { value: modelConfig.provider }),
-          this.i18n.t('cli.config.apiKey', { value: maskedKey }),
-          this.i18n.t('cli.config.baseUrl', { value: modelConfig.baseUrl }),
-          this.i18n.t('cli.config.model', { value: modelConfig.model }),
-          this.i18n.t('cli.config.maxTokens', { value: modelConfig.maxTokens }),
-          this.i18n.t('cli.config.temperature', { value: modelConfig.temperature }),
-          this.i18n.t('cli.config.timeout', { value: modelConfig.timeoutMs }),
-          this.i18n.t('cli.config.dataRoot', { value: storage.dataRoot }),
-          this.i18n.t('cli.config.configFile', { value: storage.configPath }),
-          this.i18n.t('cli.config.sessionsDir', { value: storage.sessionsDir }),
+          formatKeyValueLine('provider', modelConfig.provider),
+          formatKeyValueLine('apiKey', maskedKey),
+          formatKeyValueLine('baseUrl', modelConfig.baseUrl),
+          formatKeyValueLine('model', modelConfig.model),
+          formatKeyValueLine('maxTokens', String(modelConfig.maxTokens)),
+          formatKeyValueLine('temperature', String(modelConfig.temperature)),
+          formatKeyValueLine('timeout', `${modelConfig.timeoutMs}ms`),
+          formatKeyValueLine('dataRoot', storage.dataRoot),
+          formatKeyValueLine('config', storage.configPath),
+          formatKeyValueLine('sessions', storage.sessionsDir),
           '',
           formatConfigCommandHelp(this.i18n),
           '',
@@ -413,7 +413,10 @@ export class ApplyCliCommandUseCase {
         const sessions = await this.sessionRepository.listByWorkspace(session.workspacePath, 8)
         const lines =
           sessions.length > 0
-            ? sessions.map((item, index) => formatSessionLine(item, index, session.id, this.i18n))
+            ? [
+                '#  *  id        mode    msgs  updated      title',
+                ...sessions.map((item, index) => formatSessionLine(item, index, session.id)),
+              ]
             : [this.i18n.t('cli.sessions.empty')]
 
         addCommandOutput(
@@ -521,12 +524,12 @@ function formatSessionLine(
   session: ConversationSession,
   index: number,
   currentSessionId: string,
-  i18n: AppI18n,
 ): string {
-  const marker = session.id === currentSessionId ? i18n.t('cli.sessions.current') : session.mode
-  const updatedAt = session.updatedAt.toISOString().replace('T', ' ').slice(0, 16)
+  const marker = session.id === currentSessionId ? '*' : ' '
+  const updatedAt = session.updatedAt.toISOString().replace('T', ' ').slice(5, 16)
+  const messageCount = `${session.getMessages().length}m`
 
-  return `${index + 1}. [${formatShortSessionId(session.id)}] ${session.title} (${marker}) - ${updatedAt}`
+  return `${index + 1}. ${marker} [${formatShortSessionId(session.id)}]  ${session.mode.padEnd(5, ' ')}  ${messageCount.padStart(4, ' ')}  ${updatedAt}  ${session.title}`
 }
 
 function resolveResumeTarget(
@@ -551,14 +554,15 @@ function resolveResumeTarget(
 function formatStorageSnapshot(snapshot: StorageSettingsSnapshot, i18n: AppI18n): string {
   const lines = [
     i18n.t('cli.storage.title'),
-    i18n.t('cli.storage.source', { value: localizeStorageSource(snapshot.effectiveStorage.source, i18n) }),
-    i18n.t('cli.storage.currentRoot', { value: snapshot.effectiveStorage.dataRoot }),
-    i18n.t('cli.storage.configPath', { value: snapshot.effectiveStorage.configPath }),
-    i18n.t('cli.storage.sessionsPath', { value: snapshot.effectiveStorage.sessionsDir }),
-    i18n.t('cli.storage.settingsPath', { value: snapshot.settingsPath }),
-    i18n.t('cli.storage.customRoot', {
-      value: snapshot.configuredDataRoot ?? i18n.t('cli.storage.customRootUnset'),
-    }),
+    formatKeyValueLine('source', localizeStorageSource(snapshot.effectiveStorage.source, i18n)),
+    formatKeyValueLine('root', snapshot.effectiveStorage.dataRoot),
+    formatKeyValueLine('config', snapshot.effectiveStorage.configPath),
+    formatKeyValueLine('sessions', snapshot.effectiveStorage.sessionsDir),
+    formatKeyValueLine('settings', snapshot.settingsPath),
+    formatKeyValueLine(
+      'custom',
+      snapshot.configuredDataRoot ?? i18n.t('cli.storage.customRootUnset'),
+    ),
     '',
     i18n.t('cli.storage.usage'),
   ]
@@ -573,13 +577,13 @@ function formatStorageSnapshot(snapshot: StorageSettingsSnapshot, i18n: AppI18n)
 function formatCurrentSession(session: ConversationSession, i18n: AppI18n): string {
   return [
     i18n.t('cli.session.title'),
-    i18n.t('cli.session.id', { value: session.id }),
-    i18n.t('cli.session.shortId', { value: formatShortSessionId(session.id) }),
-    i18n.t('cli.session.name', { value: session.title }),
-    i18n.t('cli.session.mode', { value: session.mode }),
-    i18n.t('cli.session.workspace', { value: session.workspacePath }),
-    i18n.t('cli.session.messageCount', { value: session.getMessages().length }),
-    i18n.t('cli.session.updatedAt', { value: session.updatedAt.toISOString() }),
+    formatKeyValueLine('id', session.id),
+    formatKeyValueLine('short', formatShortSessionId(session.id)),
+    formatKeyValueLine('title', session.title),
+    formatKeyValueLine('mode', session.mode),
+    formatKeyValueLine('messages', String(session.getMessages().length)),
+    formatKeyValueLine('updated', session.updatedAt.toISOString()),
+    formatKeyValueLine('workspace', session.workspacePath),
   ].join('\n')
 }
 
@@ -601,22 +605,20 @@ function formatConfigCommandHelp(i18n: AppI18n): string {
 function formatConfigUpdatedText(config: ModelConfig, field: string, i18n: AppI18n): string {
   return [
     i18n.t('cli.config.updated'),
-    i18n.t('cli.config.updatedField', { value: field }),
-    i18n.t('cli.model.current', {
-      model: config.model,
-      baseUrl: config.baseUrl,
-    }),
+    formatKeyValueLine('field', field),
+    formatKeyValueLine('provider', config.provider),
+    formatKeyValueLine('model', config.model),
+    formatKeyValueLine('baseUrl', config.baseUrl),
   ].join('\n')
 }
 
 function formatConfigClearedText(config: ModelConfig, field: string, i18n: AppI18n): string {
   return [
     i18n.t('cli.config.cleared'),
-    i18n.t('cli.config.updatedField', { value: field }),
-    i18n.t('cli.model.current', {
-      model: config.model,
-      baseUrl: config.baseUrl,
-    }),
+    formatKeyValueLine('field', field),
+    formatKeyValueLine('provider', config.provider),
+    formatKeyValueLine('model', config.model),
+    formatKeyValueLine('baseUrl', config.baseUrl),
   ].join('\n')
 }
 
@@ -758,13 +760,14 @@ function formatStorageUpdate(
 ): string {
   const lines = [
     action === 'set' ? i18n.t('cli.storage.updated') : i18n.t('cli.storage.reset'),
-    i18n.t('cli.storage.currentRoot', { value: result.effectiveStorage.dataRoot }),
-    i18n.t('cli.storage.configPath', { value: result.effectiveStorage.configPath }),
-    i18n.t('cli.storage.sessionsPath', { value: result.effectiveStorage.sessionsDir }),
-    i18n.t('cli.storage.settingsPath', { value: result.settingsPath }),
-    i18n.t('cli.storage.customRoot', {
-      value: result.configuredDataRoot ?? i18n.t('cli.storage.customRootUnset'),
-    }),
+    formatKeyValueLine('root', result.effectiveStorage.dataRoot),
+    formatKeyValueLine('config', result.effectiveStorage.configPath),
+    formatKeyValueLine('sessions', result.effectiveStorage.sessionsDir),
+    formatKeyValueLine('settings', result.settingsPath),
+    formatKeyValueLine(
+      'custom',
+      result.configuredDataRoot ?? i18n.t('cli.storage.customRootUnset'),
+    ),
   ]
 
   if (result.migratedConfig) {
@@ -800,4 +803,8 @@ function localizeStorageSource(source: 'default' | 'env' | 'settings', i18n: App
     default:
       return i18n.t('cli.storage.sourceDefault')
   }
+}
+
+function formatKeyValueLine(label: string, value: string): string {
+  return `- ${label.padEnd(9, ' ')} ${value}`
 }

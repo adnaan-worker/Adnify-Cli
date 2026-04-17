@@ -31,7 +31,13 @@ export class StubAssistantResponder implements AssistantResponderPort {
     const words = content.split(/(?<=\s)/)
 
     for (const word of words) {
+      if (command.abortSignal?.aborted) {
+        throw new Error('Request aborted')
+      }
       await new Promise((resolve) => setTimeout(resolve, 30))
+      if (command.abortSignal?.aborted) {
+        throw new Error('Request aborted')
+      }
       yield { delta: word, done: false }
     }
 

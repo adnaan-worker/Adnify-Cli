@@ -1,8 +1,8 @@
 import { Box, Text } from 'ink'
+import { memo } from 'react'
 import type { AppI18n } from '../../../application/i18n/AppI18n'
 import type { AssistantMode } from '../../../domain/assistant/value-objects/AssistantMode'
 import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
-import { memo } from 'react'
 import { adnifyTheme } from '../theme'
 import { ActivityPulse } from './ActivityPulse'
 import { Panel } from './Panel'
@@ -75,7 +75,7 @@ export const HeaderBar = memo(function HeaderBar(props: HeaderBarProps) {
               active={props.busy}
               animated={props.animateBrand}
               color={adnifyTheme.brandStrong}
-              idleFrame="·  "
+              idleFrame=".. "
             />
             <MetaPill label={props.i18n.t('header.meta.workspace')} value={props.workspaceName} />
             {props.packageManager ? (

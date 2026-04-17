@@ -8,8 +8,8 @@ const messages = {
   'zh-CN': {
     'assistant.tagline': '冷静执行，精准掌控你的代码库。',
     'assistant.description':
-      '一位面向终端的 AI 编程搭档，强调结构清晰、执行可靠、体验稳定。',
-    'common.by': 'by',
+      '一位面向终端的 AI 编程搭档，强调结构清晰、执行可靠、交互稳定。',
+    'common.by': '作者',
     'common.yes': '是',
     'common.no': '否',
 
@@ -40,8 +40,8 @@ const messages = {
     'input.labelSetup': 'setup',
     'input.labelSetupMode': 'config',
     'input.placeholder': '描述任务，或输入 / 打开命令列表。',
-    'input.hintSuggestions': '上下选择  Tab 补全  Enter 执行',
-    'input.hintDefault': 'Enter 发送  / 命令',
+    'input.hintSuggestions': '上下选择  Tab/Enter 填入  Esc 关闭',
+    'input.hintDefault': 'Enter 发送  / 命令  Up/Down 历史',
     'input.hintConfigInit': 'Enter 继续  Esc 退出配置',
 
     'status.system': 'system',
@@ -58,6 +58,8 @@ const messages = {
     'status.executionFailed': '执行失败：{message}',
     'status.responseFailed': '响应失败：{message}',
     'status.configFailed': '配置失败：{message}',
+    'status.executionAborting': '正在中止当前执行...',
+    'status.executionAborted': '已中止当前执行。',
     'status.responseCompleted': '已完成一轮响应。',
     'status.inputIgnored': '输入为空，已忽略。',
 
@@ -159,7 +161,8 @@ const messages = {
     'cli.config.howToEnv':
       '2. 或设置环境变量：ADNIFY_API_KEY、ADNIFY_BASE_URL、ADNIFY_MODEL、ADNIFY_PROVIDER',
     'cli.config.commandHelpTitle': '命令式配置：',
-    'cli.config.commandHelpSetProvider': '- :config set provider <openai-compatible|openai-responses|anthropic|google>',
+    'cli.config.commandHelpSetProvider':
+      '- :config set provider <openai-compatible|openai-responses|anthropic|google>',
     'cli.config.commandHelpSetModel': '- :config set model <model>',
     'cli.config.commandHelpSetApiKey': '- :config set api-key <key>',
     'cli.config.commandHelpSetBaseUrl': '- :config set base-url <url>',
@@ -204,8 +207,9 @@ const messages = {
     'cli.storage.sourceEnv': '环境变量 ADNIFY_HOME',
     'cli.storage.usage':
       '用法：:storage 查看当前设置，:storage set <path> 设置目录，:storage reset 恢复默认目录。',
-    'cli.storage.envOverride': '注意：当前存在 ADNIFY_HOME，已保存的目录设置会被环境变量覆盖。',
-    'cli.storage.setMissingPath': '缺少目标路径，请在 :storage set 后面提供目录。',
+    'cli.storage.envOverride':
+      '注意：当前存在 ADNIFY_HOME，已保存的目录设置会被环境变量覆盖。',
+    'cli.storage.setMissingPath': '缺少目标路径，请在 :storage set 后提供目录。',
     'cli.storage.invalidStatus': '存储目录设置失败：缺少路径。',
     'cli.storage.updated': '已保存新的存储目录设置。',
     'cli.storage.updatedStatus': '新的存储目录已写入设置。',
@@ -313,8 +317,8 @@ const messages = {
     'input.labelSetup': 'setup',
     'input.labelSetupMode': 'config',
     'input.placeholder': 'Describe the task, or type / to open commands.',
-    'input.hintSuggestions': 'Up/Down select  Tab complete  Enter run',
-    'input.hintDefault': 'Enter send  / commands',
+    'input.hintSuggestions': 'Up/Down select  Tab/Enter fill  Esc close',
+    'input.hintDefault': 'Enter send  / commands  Up/Down history',
     'input.hintConfigInit': 'Enter continue  Esc exit setup',
 
     'status.system': 'system',
@@ -331,6 +335,8 @@ const messages = {
     'status.executionFailed': 'Execution failed: {message}',
     'status.responseFailed': 'Response failed: {message}',
     'status.configFailed': 'Configuration failed: {message}',
+    'status.executionAborting': 'Aborting current execution...',
+    'status.executionAborted': 'Current execution aborted.',
     'status.responseCompleted': 'Completed one response.',
     'status.inputIgnored': 'Empty input ignored.',
 

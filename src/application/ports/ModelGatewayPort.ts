@@ -10,6 +10,7 @@ export interface ModelRequest {
   model: string
   temperature?: number
   maxTokens?: number
+  abortSignal?: AbortSignal
 }
 
 export interface ModelStreamChunk {

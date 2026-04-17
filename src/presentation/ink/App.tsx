@@ -24,6 +24,8 @@ export function App(props: AppProps) {
     onExit: exit,
   })
   const { i18n } = props.runtime
+  const animationLevel = props.runtime.ui.animationLevel
+  const enableFullAnimation = animationLevel === 'full'
 
   useInput(controller.handleInput)
 
@@ -80,7 +82,7 @@ export function App(props: AppProps) {
           mode="agent"
           modelLabel={i18n.t('app.boot.modelLabel')}
           busy
-          animateBrand
+          animateBrand={enableFullAnimation}
           i18n={i18n}
         />
         <Box width="100%" marginTop={1}>
@@ -93,7 +95,7 @@ export function App(props: AppProps) {
               <Box gap={1}>
                 <ActivityPulse
                   active
-                  animated
+                  animated={enableFullAnimation}
                   color={adnifyTheme.brandStrong}
                   idleFrame=".  "
                 />
@@ -163,6 +165,7 @@ export function App(props: AppProps) {
               messages={messages}
               streamingText={controller.streamingText}
               viewportRows={conversationViewportRows}
+              animateStreamingIndicator={enableFullAnimation}
               i18n={i18n}
             />
           </Box>
@@ -173,6 +176,7 @@ export function App(props: AppProps) {
         <InputDock
           value={controller.inputValue}
           busy={controller.isBusy}
+          animateBusyIndicator={enableFullAnimation}
           mode={controller.session.mode}
           modelLabel={modelLabel}
           configInitPrompt={controller.configInitPrompt}

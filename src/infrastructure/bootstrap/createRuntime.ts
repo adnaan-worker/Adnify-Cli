@@ -24,12 +24,14 @@ import { resolveAppStorage } from '../storage/resolveAppStorage'
 import { CryptoIdGenerator } from '../system/CryptoIdGenerator'
 import { SystemClock } from '../system/SystemClock'
 import { LocalWorkspaceContextService } from '../workspace/LocalWorkspaceContextService'
+import { resolveUiPreferences } from './resolveUiPreferences'
 
 export type { AdnifyCliRuntime }
 
 export async function createRuntime(): Promise<AdnifyCliRuntime> {
   const logger = new ConsoleLogger()
   const i18n = createAppI18n(resolveAppLocaleFromEnv())
+  const ui = resolveUiPreferences()
   const config = new DefaultCliConfigAdapter()
   const storage = await resolveAppStorage()
   const storageSettings = new FileStorageSettingsAdapter()
@@ -114,6 +116,7 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
 
   return {
     i18n,
+    ui,
     useCases: {
       bootstrapCli: new BootstrapCliUseCase(workspaceContextService, config, logger, i18n),
       createSession,

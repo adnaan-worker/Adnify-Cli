@@ -14,6 +14,7 @@ export interface ConversationViewportProps {
   messages: ConversationMessage[]
   streamingText?: string
   viewportRows: number
+  animateStreamingIndicator?: boolean
   i18n: AppI18n
 }
 
@@ -25,6 +26,8 @@ interface TextViewportRow {
   indent?: number
   prefix?: string
   prefixColor?: string
+  backgroundColor?: string
+  bold?: boolean
 }
 
 interface SpacerViewportRow {
@@ -179,10 +182,10 @@ function appendMessageRows(
       case 'command-input':
         appendWrappedRows(rows, {
           keyPrefix: `${message.id}-command-input`,
-          prefix: '/',
+          prefix: ':',
           prefixColor: adnifyTheme.brandStrong,
-          content: structured.content.replace(/^\//, ''),
-          contentColor: adnifyTheme.brandSoft,
+          content: structured.content.replace(/^[:/]/, ''),
+          contentColor: adnifyTheme.brand,
           contentWidth,
         })
         return
@@ -191,9 +194,9 @@ function appendMessageRows(
 
         appendWrappedRows(rows, {
           keyPrefix: `${message.id}-command-output-title`,
-          prefix: '|',
+          prefix: '>',
           prefixColor: accentColor,
-          content: `${structured.title ?? i18n.t('conversation.output')} / ${i18n.t('conversation.localCommand')}`,
+          content: structured.title ?? i18n.t('conversation.output'),
           contentColor: accentColor,
           contentWidth,
         })
@@ -309,7 +312,7 @@ function buildViewportRows(
   return rows
 }
 
-function renderViewportRow(row: ViewportRow) {
+function renderViewportRow(row: ViewportRow, animateStreamingIndicator: boolean) {
   if (row.kind === 'spacer') {
     return <Text key={row.key}>{' '}</Text>
   }
@@ -318,7 +321,12 @@ function renderViewportRow(row: ViewportRow) {
     return (
       <Box key={row.key} width="100%" gap={1}>
         <Text color={adnifyTheme.brand}>adnify</Text>
-        <ActivityPulse active animated color={adnifyTheme.brandStrong} idleFrame=".  " />
+        <ActivityPulse
+          active
+          animated={animateStreamingIndicator}
+          color={adnifyTheme.brandStrong}
+          idleFrame=".  "
+        />
         <Text color={adnifyTheme.textDim}>{row.label}</Text>
       </Box>
     )
@@ -329,7 +337,12 @@ function renderViewportRow(row: ViewportRow) {
       {row.prefix ? (
         <Text color={row.prefixColor ?? adnifyTheme.textSecondary}>{row.prefix}</Text>
       ) : null}
-      <Text color={row.contentColor} wrap="truncate-end">
+      <Text
+        color={row.contentColor}
+        backgroundColor={row.backgroundColor}
+        bold={row.bold}
+        wrap="truncate-end"
+      >
         {row.content}
       </Text>
     </Box>
@@ -373,7 +386,9 @@ export const ConversationViewport = memo(function ConversationViewport(
       accent="muted"
     >
       <Box height={props.viewportRows} flexDirection="column" overflowY="hidden">
-        {visibleRows.map((row) => renderViewportRow(row))}
+        {visibleRows.map((row) =>
+          renderViewportRow(row, Boolean(props.animateStreamingIndicator)),
+        )}
         {Array.from({ length: fillerCount }, (_, index) => (
           <Text key={`viewport-filler-${index}`}>{' '}</Text>
         ))}

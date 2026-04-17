@@ -12,6 +12,7 @@ import { createSessionTitle } from '../support/createSessionTitle'
 export interface SubmitPromptCommand {
   sessionId: string
   prompt: string
+  abortSignal?: AbortSignal
 }
 
 export interface SubmitPromptResult {
@@ -105,6 +106,7 @@ export class SubmitPromptUseCase {
         session,
         workspace,
         toolCatalog: this.config.getToolCatalog(),
+        abortSignal: command.abortSignal,
       })) {
         if (chunk.delta) {
           chunks.push(chunk.delta)
@@ -149,7 +151,9 @@ export class SubmitPromptUseCase {
 
       return {
         session,
-        statusLine: this.i18n.t('status.responseFailed', { message: err.message }),
+        statusLine: command.abortSignal?.aborted
+          ? this.i18n.t('status.executionAborted')
+          : this.i18n.t('status.responseFailed', { message: err.message }),
       }
     }
   }
