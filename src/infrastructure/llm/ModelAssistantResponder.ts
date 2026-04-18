@@ -9,6 +9,8 @@ import type {
 import type { CliConfigPort } from '../../application/ports/CliConfigPort'
 import type { LoggerPort } from '../../application/ports/LoggerPort'
 import type { ModelGatewayPort, ModelMessage } from '../../application/ports/ModelGatewayPort'
+import type { ToolExecutorPort } from '../../application/ports/ToolExecutorPort'
+import { parseToolCallMarkup } from '../../application/support/ToolCallMarkup'
 import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import type { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
 import type { WorkspaceContext } from '../../domain/workspace/entities/WorkspaceContext'
@@ -18,9 +20,12 @@ export class ModelAssistantResponder implements AssistantResponderPort {
     private gateway: ModelGatewayPort,
     private config: ModelConfig,
     private readonly cliConfig: CliConfigPort,
+    private readonly toolExecutor: ToolExecutorPort,
     private readonly logger: LoggerPort,
     private readonly i18n: AppI18n,
   ) {}
+
+  private readonly maxAgentTurns = 4
 
   updateGateway(gateway: ModelGatewayPort, config: ModelConfig): void {
     this.gateway = gateway
@@ -46,17 +51,54 @@ export class ModelAssistantResponder implements AssistantResponderPort {
     })
 
     try {
-      for await (const chunk of this.gateway.streamChat({
-        messages,
-        model: this.config.model,
-        temperature: this.config.temperature,
-        maxTokens: this.config.maxTokens,
-        abortSignal: command.abortSignal,
-      })) {
-        yield {
-          delta: chunk.delta,
-          done: chunk.finishReason === 'stop' || chunk.finishReason === 'length',
+      let activeMessages = [...messages]
+
+      for (let turn = 0; turn < this.maxAgentTurns; turn += 1) {
+        const responseText = await this.collectResponseText(activeMessages, command.abortSignal)
+        const toolCall = parseToolCallMarkup(responseText)
+
+        if (!toolCall) {
+          yield {
+            delta: responseText,
+            done: true,
+          }
+          return
         }
+
+        const toolResult = await this.toolExecutor.execute({
+          toolId: toolCall.name,
+          input: toolCall.input,
+          workspace: command.workspace,
+        })
+
+        this.logger.info('Executed assistant tool call', {
+          toolId: toolResult.toolId,
+          ok: toolResult.ok,
+          mode: command.session.mode,
+        })
+
+        activeMessages = [
+          ...activeMessages,
+          { role: 'assistant', content: responseText },
+          {
+            role: 'user',
+            content: [
+              `Tool result for ${toolResult.toolId}:`,
+              toolResult.ok ? 'status: ok' : 'status: failed',
+              toolResult.content,
+              '',
+              'Continue the task. If another tool is required, emit one tool call only.',
+            ].join('\n'),
+          },
+        ]
+      }
+
+      yield {
+        delta:
+          this.i18n.locale === 'en'
+            ? 'I reached the current tool-execution turn limit. Please refine the request or continue.'
+            : '已达到当前工具执行轮次上限，请继续细化需求或再次发起执行。',
+        done: true,
       }
     } catch (error) {
       this.logger.error('Model gateway error', {
@@ -64,6 +106,25 @@ export class ModelAssistantResponder implements AssistantResponderPort {
       })
       throw error
     }
+  }
+
+  private async collectResponseText(
+    messages: ModelMessage[],
+    abortSignal?: AbortSignal,
+  ): Promise<string> {
+    const chunks: string[] = []
+
+    for await (const chunk of this.gateway.streamChat({
+      messages,
+      model: this.config.model,
+      temperature: this.config.temperature,
+      maxTokens: this.config.maxTokens,
+      abortSignal,
+    })) {
+      chunks.push(chunk.delta)
+    }
+
+    return chunks.join('').trim()
   }
 
   private buildMessages(command: AssistantResponderCommand): ModelMessage[] {
@@ -130,6 +191,12 @@ export class ModelAssistantResponder implements AssistantResponderPort {
       '',
       '## Available Tool Definitions',
       toolBlock,
+      '',
+      '## Tool Calling Protocol',
+      `When you need a tool, respond with exactly one ${'<adnify_tool_call name="tool-id">...</adnify_tool_call>'} block and nothing else.`,
+      'The inner content must be valid JSON.',
+      'After the tool result is returned, continue the task normally.',
+      'Available executable tools in this build: workspace-read, search-index.',
     ].join('\n')
   }
 }

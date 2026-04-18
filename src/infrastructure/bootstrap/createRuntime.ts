@@ -12,6 +12,7 @@ import { ResolveStartupSessionUseCase } from '../../application/use-cases/Resolv
 import { SubmitPromptUseCase } from '../../application/use-cases/SubmitPromptUseCase'
 import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import type { ModelConfigStorePort } from '../../application/ports/ModelConfigStorePort'
+import type { ToolExecutorPort } from '../../application/ports/ToolExecutorPort'
 import { DefaultCliConfigAdapter } from '../config/DefaultCliConfigAdapter'
 import { AiSdkGateway } from '../llm/AiSdkGateway'
 import { ModelAssistantResponder } from '../llm/ModelAssistantResponder'
@@ -23,6 +24,7 @@ import { FileStorageSettingsAdapter } from '../storage/FileStorageSettingsAdapte
 import { resolveAppStorage } from '../storage/resolveAppStorage'
 import { CryptoIdGenerator } from '../system/CryptoIdGenerator'
 import { SystemClock } from '../system/SystemClock'
+import { LocalToolExecutor } from '../tooling/LocalToolExecutor'
 import { LocalWorkspaceContextService } from '../workspace/LocalWorkspaceContextService'
 import { resolveUiPreferences } from './resolveUiPreferences'
 
@@ -40,6 +42,7 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
   const idGenerator = new CryptoIdGenerator()
   const clock = new SystemClock()
   const workspaceContextService = new LocalWorkspaceContextService()
+  const toolExecutor = new LocalToolExecutor()
 
   const promptBundle = await loadPromptBundle()
   config.setPromptBundle(promptBundle)
@@ -54,7 +57,7 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
     save: writeModelConfig,
   }
 
-  const initialStack = createResponderStack(modelConfig, config, logger, i18n)
+  const initialStack = createResponderStack(modelConfig, config, toolExecutor, logger, i18n)
   let currentResponder = initialStack.responder
   let currentGateway = initialStack.gateway
 
@@ -94,7 +97,7 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
       return newConfig
     }
 
-    const newStack = createResponderStack(newConfig, config, logger, i18n)
+    const newStack = createResponderStack(newConfig, config, toolExecutor, logger, i18n)
     currentResponder = newStack.responder
     currentGateway = newStack.gateway
     submitPrompt.updateResponder(currentResponder)
@@ -141,6 +144,7 @@ export async function createRuntime(): Promise<AdnifyCliRuntime> {
 function createResponderStack(
   modelConfig: ModelConfig,
   config: DefaultCliConfigAdapter,
+  toolExecutor: ToolExecutorPort,
   logger: LoggerPort,
   i18n: ReturnType<typeof createAppI18n>,
 ) {
@@ -156,6 +160,13 @@ function createResponderStack(
   })
 
   const gateway = new AiSdkGateway(modelConfig, logger)
-  const responder = new ModelAssistantResponder(gateway, modelConfig, config, logger, i18n)
+  const responder = new ModelAssistantResponder(
+    gateway,
+    modelConfig,
+    config,
+    toolExecutor,
+    logger,
+    i18n,
+  )
   return { responder, gateway }
 }
