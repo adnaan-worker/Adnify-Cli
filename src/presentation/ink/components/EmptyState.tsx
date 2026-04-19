@@ -5,9 +5,8 @@ import type { AssistantMode } from '../../../domain/assistant/value-objects/Assi
 import type { PackageManagerName } from '../../../domain/workspace/entities/WorkspaceContext'
 import { memo } from 'react'
 import { adnifyTheme } from '../theme'
-import { Panel } from './Panel'
+import { MascotGlyph } from './MascotGlyph'
 import { RecentSessionsList } from './RecentSessionsList'
-import { Wordmark } from './Wordmark'
 
 export interface EmptyStateProps {
   assistantName: string
@@ -44,14 +43,12 @@ function ModeBadge(props: { mode: AssistantMode; busy?: boolean }) {
   )
 }
 
-function MetaPill(props: { label: string; value: string; color?: string }) {
+function MetaRow(props: { label: string; value: string; color?: string }) {
   return (
-    <Text backgroundColor={adnifyTheme.backgroundHint}>
-      {' '}
+    <Box width="100%" justifyContent="space-between">
       <Text color={adnifyTheme.textDim}>{props.label}</Text>
       <Text color={props.color ?? adnifyTheme.textSecondary}>{props.value}</Text>
-      {' '}
-    </Text>
+    </Box>
   )
 }
 
@@ -71,67 +68,71 @@ export const EmptyState = memo(function EmptyState(props: EmptyStateProps) {
   const gitColor = props.isGitRepository ? adnifyTheme.success : adnifyTheme.warm
 
   return (
-    <Panel accent="brand">
-      <Box width="100%" justifyContent="space-between" alignItems="flex-start">
-        <Box flexDirection="column" flexGrow={1} marginRight={3}>
-          <Wordmark
-            appName={props.assistantName}
-            author={props.author}
-            tagline={props.tagline}
-            busy={props.busy}
-            i18n={props.i18n}
-          />
-
-          <Box flexDirection="column" marginTop={1}>
-            <Text color={adnifyTheme.textMuted}>{props.description}</Text>
-            <Text color={adnifyTheme.textDim}>{props.i18n.t('empty.hint')}</Text>
-          </Box>
-
-          <Box gap={1} marginTop={1}>
-            <MetaPill label={props.i18n.t('header.meta.workspace')} value={props.workspaceName} />
-            <MetaPill
-              label={props.i18n.t('header.meta.package')}
-              value={props.packageManager}
-              color={adnifyTheme.brandSoft}
-            />
-            <MetaPill label={props.i18n.t('header.meta.git')} value={gitLabel} color={gitColor} />
-          </Box>
-        </Box>
-
-        <Box width={34} flexDirection="column" flexShrink={0}>
-          <Box alignItems="center" justifyContent="space-between">
-            <Text color={adnifyTheme.textDim}>{props.i18n.t('empty.panelSession')}</Text>
-            <ModeBadge mode={props.mode} busy={props.busy} />
-          </Box>
-
-          <Box
-            flexDirection="column"
-            marginTop={1}
-            borderStyle="round"
-            borderColor={adnifyTheme.borderMuted}
-            paddingX={1}
-          >
-            <Text color={adnifyTheme.brandSoft}>{props.i18n.t('empty.panelQuickStart')}</Text>
-            <Text color={adnifyTheme.textDim} wrap="truncate-end">
-              {props.modelLabel}
+    <Box
+      width="100%"
+      flexDirection="row"
+      borderStyle="round"
+      borderColor={adnifyTheme.borderActive}
+      paddingX={2}
+      paddingY={1}
+      justifyContent="space-between"
+    >
+      {/* Left Column: Big Mascot & Brand */}
+      <Box flexDirection="column" flexGrow={1} alignItems="center" justifyContent="center">
+        <MascotGlyph active={props.busy} large />
+        <Box flexDirection="column" alignItems="center" marginTop={1}>
+          <Box gap={1}>
+            <Text color={adnifyTheme.brandSoft} bold>
+              {props.assistantName}
             </Text>
-
-            <Box flexDirection="column" marginTop={1}>
-              {props.commands.slice(0, 4).map((command) => (
-                <QuickCommandItem key={command} command={command} />
-              ))}
-            </Box>
-
-            <RecentSessionsList
-              sessions={props.recentSessions}
-              currentSessionId={props.currentSessionId}
-              i18n={props.i18n}
-              layout="stack"
-              limit={3}
-            />
+            <Text color={adnifyTheme.textDim}>
+              {props.i18n.t('common.by')} {props.author}
+            </Text>
+          </Box>
+          <Text color={adnifyTheme.textSecondary}>{props.tagline}</Text>
+          <Box marginTop={1}>
+            <Text color={adnifyTheme.textMuted}>{props.description}</Text>
           </Box>
         </Box>
       </Box>
-    </Panel>
+
+      {/* Right Column: Dashboard Info */}
+      <Box width={45} flexDirection="column" flexShrink={0} paddingLeft={3}>
+        <Box justifyContent="space-between" alignItems="center" marginBottom={1}>
+          <Text color={adnifyTheme.textDim}>{props.i18n.t('empty.panelSession')}</Text>
+          <ModeBadge mode={props.mode} busy={props.busy} />
+        </Box>
+
+        <Box flexDirection="column" gap={0} marginBottom={1}>
+          <MetaRow label={props.i18n.t('header.meta.workspace')} value={props.workspaceName} />
+          <MetaRow
+            label={props.i18n.t('header.meta.package')}
+            value={props.packageManager}
+            color={adnifyTheme.brandSoft}
+          />
+          <MetaRow label={props.i18n.t('header.meta.git')} value={gitLabel} color={gitColor} />
+          <MetaRow label="Model" value={props.modelLabel} color={adnifyTheme.textMuted} />
+        </Box>
+
+        <Box flexDirection="column" marginTop={1}>
+          <Text color={adnifyTheme.brandSoft}>{props.i18n.t('empty.panelQuickStart')}</Text>
+          <Box flexDirection="column" marginTop={1} gap={0}>
+            {props.commands.slice(0, 4).map((command) => (
+              <QuickCommandItem key={command} command={command} />
+            ))}
+          </Box>
+        </Box>
+
+        <Box marginTop={1} flexDirection="column">
+          <RecentSessionsList
+            sessions={props.recentSessions}
+            currentSessionId={props.currentSessionId}
+            i18n={props.i18n}
+            layout="stack"
+            limit={3}
+          />
+        </Box>
+      </Box>
+    </Box>
   )
 })

@@ -149,11 +149,18 @@ function appendWrappedRows(
     indent?: number
     prefix?: string
     prefixColor?: string
+    linePrefix?: string
+    linePrefixColor?: string
   },
 ) {
   const baseIndent = options.indent ?? 0
   const prefixPadding = options.prefix ? getDisplayWidth(options.prefix) + 1 : 0
-  const availableContentWidth = Math.max(8, options.contentWidth - baseIndent - prefixPadding)
+  const linePrefixPadding = options.linePrefix ? getDisplayWidth(options.linePrefix) + 1 : 0
+  
+  // Use the maximum padding required by either the first line prefix or subsequent line prefixes
+  const maxPrefixPadding = Math.max(prefixPadding, linePrefixPadding)
+  const availableContentWidth = Math.max(8, options.contentWidth - baseIndent - maxPrefixPadding)
+  
   const lines = wrapContent(options.content, availableContentWidth)
 
   lines.forEach((line, index) => {
@@ -162,9 +169,12 @@ function appendWrappedRows(
       key: `${options.keyPrefix}-${index}`,
       content: line || ' ',
       contentColor: options.contentColor,
-      indent: index === 0 ? baseIndent : baseIndent + prefixPadding,
-      prefix: index === 0 ? options.prefix : undefined,
-      prefixColor: index === 0 ? options.prefixColor : undefined,
+      // Calculate indent carefully to ensure the text content aligns vertically
+      indent: index === 0 
+        ? baseIndent 
+        : baseIndent + (prefixPadding - linePrefixPadding),
+      prefix: index === 0 ? options.prefix : options.linePrefix,
+      prefixColor: index === 0 ? options.prefixColor : options.linePrefixColor,
     })
   })
 }
@@ -202,6 +212,10 @@ function appendMessageRows(
         })
         appendWrappedRows(rows, {
           keyPrefix: `${message.id}-command-output-body`,
+          prefix: '│',
+          prefixColor: adnifyTheme.borderMuted,
+          linePrefix: '│',
+          linePrefixColor: adnifyTheme.borderMuted,
           content: structured.content,
           contentColor: adnifyTheme.textSecondary,
           contentWidth,
@@ -222,6 +236,10 @@ function appendMessageRows(
         })
         appendWrappedRows(rows, {
           keyPrefix: `${message.id}-notice-body`,
+          prefix: '│',
+          prefixColor: accentColor,
+          linePrefix: '│',
+          linePrefixColor: accentColor,
           content: structured.content,
           contentColor: adnifyTheme.textMuted,
           contentWidth,
@@ -244,16 +262,20 @@ function appendMessageRows(
       })
       appendWrappedRows(rows, {
         keyPrefix: `${message.id}-assistant-body`,
+        prefix: '│',
+        prefixColor: adnifyTheme.borderActive,
+        linePrefix: '│',
+        linePrefixColor: adnifyTheme.borderActive,
         content: message.content,
         contentColor: adnifyTheme.textPrimary,
         contentWidth,
-        indent: 2,
+        indent: 1,
       })
       return
     case 'user':
       appendWrappedRows(rows, {
         keyPrefix: `${message.id}-user`,
-        prefix: '>',
+        prefix: '❯',
         prefixColor: adnifyTheme.user,
         content: message.content,
         contentColor: adnifyTheme.textPrimary,
@@ -272,6 +294,10 @@ function appendMessageRows(
       })
       appendWrappedRows(rows, {
         keyPrefix: `${message.id}-system-body`,
+        prefix: '│',
+        prefixColor: adnifyTheme.borderMuted,
+        linePrefix: '│',
+        linePrefixColor: adnifyTheme.borderMuted,
         content: message.content,
         contentColor: adnifyTheme.textMuted,
         contentWidth,

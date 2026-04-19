@@ -87,14 +87,9 @@ export const InputDock = memo(function InputDock(props: InputDockProps) {
         </Box>
       ) : null}
 
-      <Box
-        marginTop={1}
-        borderStyle="round"
-        borderColor={props.isSuggestionOpen ? adnifyTheme.borderActive : adnifyTheme.borderMuted}
-        paddingX={1}
-      >
+      <Box marginTop={1} paddingX={1}>
         <Box gap={1}>
-          <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.success}>{'>'}</Text>
+          <Text color={props.busy ? adnifyTheme.brand : adnifyTheme.success}>{props.busy ? '⠋' : '❯'}</Text>
           {props.value ? (
             <Box>
               <Text color={adnifyTheme.textPrimary}>{props.value}</Text>
