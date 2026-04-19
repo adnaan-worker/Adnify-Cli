@@ -124,7 +124,9 @@ describe('ModelAssistantResponder', () => {
     expect(capturedRequest?.messages[0]?.content).toContain('core system')
     expect(capturedRequest?.messages[0]?.content).toContain('agent instructions')
     expect(capturedRequest?.messages[0]?.content).toContain('当前模式：agent')
-    expect(capturedRequest?.messages[0]?.content).toContain('Shell Runner [terminal] (dangerous)')
+    expect(capturedRequest?.messages[0]?.content).toContain('[native: shell_runner]')
+    expect(capturedRequest?.agentic?.mode).toBe('agent')
+    expect(capturedRequest?.agentic?.workspacePath).toBe('/workspace')
     expect(capturedRequest?.messages[capturedRequest.messages.length - 1]?.content).toBe(
       'implement feature',
     )

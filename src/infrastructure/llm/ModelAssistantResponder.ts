@@ -8,6 +8,7 @@ import type {
 } from '../../application/ports/AssistantResponderPort'
 import type { CliConfigPort } from '../../application/ports/CliConfigPort'
 import type { LoggerPort } from '../../application/ports/LoggerPort'
+import { nativeToolKeyFromCatalogId } from '../../application/tooling/nativeToolKey'
 import type { ModelGatewayPort, ModelMessage } from '../../application/ports/ModelGatewayPort'
 import type { ModelConfig } from '../../domain/assistant/value-objects/ModelConfig'
 import type { ConversationSession } from '../../domain/session/aggregates/ConversationSession'
@@ -52,6 +53,11 @@ export class ModelAssistantResponder implements AssistantResponderPort {
         temperature: this.config.temperature,
         maxTokens: this.config.maxTokens,
         abortSignal: command.abortSignal,
+        agentic: {
+          mode: command.session.mode,
+          workspacePath: command.workspace.rootPath,
+          toolCatalog: command.toolCatalog.map((tool) => tool.toPlainObject()),
+        },
       })) {
         yield {
           delta: chunk.delta,
@@ -100,7 +106,10 @@ export class ModelAssistantResponder implements AssistantResponderPort {
     const modePrompt = promptSet.modes[session.mode]
     const toolBlock =
       toolCatalog
-        .map((tool) => `- ${tool.name} [${tool.category}] (${tool.riskLevel}): ${tool.description}`)
+        .map(
+          (tool) =>
+            `- ${tool.name} [native: ${nativeToolKeyFromCatalogId(tool.id)}] [${tool.category}] (${tool.riskLevel}): ${tool.description}`,
+        )
         .join('\n') || this.i18n.t('modelPrompt.noTools')
 
     const workspaceBlock = [

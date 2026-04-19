@@ -1,5 +1,6 @@
 import { copyFile, cp, mkdir, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join as posixJoin } from 'node:path/posix'
+import { join as win32Join } from 'node:path/win32'
 import type {
   StorageSettingsSnapshot,
   StorageSettingsUpdateResult,
@@ -15,35 +16,61 @@ import { readStorageSettingsFile, writeStorageSettingsFile } from './storageSett
 const CONFIG_FILE = 'config.json'
 const SESSIONS_DIR = 'sessions'
 
+function storageJoin(platform: NodeJS.Platform, ...parts: string[]): string {
+  return platform === 'win32' ? win32Join(...parts) : posixJoin(...parts)
+}
+
+/**
+ * 在非 Windows 主机上跑「platform: win32」单测时，settings 里可能出现反斜杠路径；
+ * Node 文件 API 需要转成 POSIX 才能命中真实目录。
+ */
+function toHostFilesystemPath(pathValue: string): string {
+  if (process.platform === 'win32') {
+    return pathValue
+  }
+
+  return pathValue.replace(/\\/g, '/')
+}
+
+function joinForFilesystem(...parts: string[]): string {
+  return process.platform === 'win32' ? win32Join(...parts) : posixJoin(...parts)
+}
+
 export class FileStorageSettingsAdapter implements StorageSettingsPort {
   constructor(private readonly options: ResolveAppStorageOptions = {}) {}
 
   async inspect(): Promise<StorageSettingsSnapshot> {
     const storage = await resolveAppStorage(this.options)
     const settings = await readStorageSettingsFile(storage.settingsPath)
+    const rawConfigured = settings.dataDirectory?.trim()
+    const hostSafeConfigured = rawConfigured ? toHostFilesystemPath(rawConfigured) : undefined
 
     return {
       effectiveStorage: storage,
       settingsPath: storage.settingsPath,
-      configuredDataRoot: normalizeStoragePath(settings.dataDirectory, this.options.platform) ?? null,
+      /** 始终按本机 OS 解析路径；`options.platform` 只用于 `resolveAppStorage` 布局模拟，不能参与 normalize。 */
+      configuredDataRoot: normalizeStoragePath(hostSafeConfigured, process.platform) ?? null,
     }
   }
 
   async setDataDirectory(path: string): Promise<StorageSettingsUpdateResult> {
     const current = await resolveAppStorage(this.options)
-    const nextDataRoot = normalizeStoragePath(path.trim(), this.options.platform)
+    const nextDataRoot = normalizeStoragePath(path.trim(), process.platform)
 
     if (!nextDataRoot) {
       throw new Error('Storage path is required')
     }
 
+    /** 在 macOS/Linux 上必须把反斜杠规范成 POSIX，否则 resolve 会把路径接到 cwd 下，污染仓库目录。 */
+    const persistedDataDirectory = toHostFilesystemPath(nextDataRoot)
+
     await writeStorageSettingsFile(current.settingsPath, {
-      dataDirectory: nextDataRoot,
+      dataDirectory: persistedDataDirectory,
     })
 
     const migration = await migrateStorageContents(
       current.dataRoot,
-      nextDataRoot,
+      persistedDataDirectory,
       this.options.platform,
     )
     const snapshot = await this.inspect()
@@ -83,12 +110,15 @@ async function migrateStorageContents(
     }
   }
 
-  await mkdir(nextDataRoot, { recursive: true })
+  const srcRoot = toHostFilesystemPath(currentDataRoot)
+  const dstRoot = toHostFilesystemPath(nextDataRoot)
 
-  const sourceConfigPath = join(currentDataRoot, CONFIG_FILE)
-  const targetConfigPath = join(nextDataRoot, CONFIG_FILE)
-  const sourceSessionsPath = join(currentDataRoot, SESSIONS_DIR)
-  const targetSessionsPath = join(nextDataRoot, SESSIONS_DIR)
+  await mkdir(dstRoot, { recursive: true })
+
+  const sourceConfigPath = joinForFilesystem(srcRoot, CONFIG_FILE)
+  const targetConfigPath = joinForFilesystem(dstRoot, CONFIG_FILE)
+  const sourceSessionsPath = joinForFilesystem(srcRoot, SESSIONS_DIR)
+  const targetSessionsPath = joinForFilesystem(dstRoot, SESSIONS_DIR)
 
   const configCanCopy = await pathExists(sourceConfigPath)
   const configAlreadyExists = await pathExists(targetConfigPath)

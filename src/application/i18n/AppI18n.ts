@@ -269,7 +269,7 @@ const messages = {
     'stub.suggestion.tools':
       '工具系统建议采用“目录 + 权限 + 执行器 + 结果模型”的四段式设计。',
     'stub.suggestion.default':
-      '当前仍是脚手架阶段，建议优先补齐模型网关、工具注册中心和配置系统。',
+      '当前未配置 API Key，因此是占位回复。请在 config 中设置 model.apiKey 或执行 :config set api-key 后重试，即可使用真实模型与原生工具。',
 
     'modelPrompt.language.self': '简体中文',
     'modelPrompt.respondIn': 'Unless the user explicitly asks otherwise, respond in {language}.',
@@ -548,7 +548,7 @@ const messages = {
     'stub.suggestion.tools':
       'The tool system should follow a four-part design: catalog, permissions, executor, and result model.',
     'stub.suggestion.default':
-      'This is still an early scaffold, so model gateway, tool registry, and configuration deserve priority.',
+      'No API key is configured, so this is a stub reply. Set model.apiKey in config or run :config set api-key, then restart, to use the real model and native tools.',
 
     'modelPrompt.language.self': 'English',
     'modelPrompt.respondIn': 'Unless the user explicitly asks otherwise, respond in {language}.',
