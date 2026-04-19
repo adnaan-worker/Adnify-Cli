@@ -1,8 +1,16 @@
+import type { AssistantMode } from '../../domain/assistant/value-objects/AssistantMode'
 import type { MessageRole } from '../../domain/session/value-objects/MessageRole'
+import type { ToolDescriptorProps } from '../../domain/tooling/entities/ToolDescriptor'
 
 export interface ModelMessage {
   role: MessageRole
   content: string
+}
+
+export interface ModelAgenticContext {
+  mode: AssistantMode
+  workspacePath: string
+  toolCatalog: ToolDescriptorProps[]
 }
 
 export interface ModelRequest {
@@ -11,6 +19,11 @@ export interface ModelRequest {
   temperature?: number
   maxTokens?: number
   abortSignal?: AbortSignal
+  /**
+   * When present, native tool execution may be enabled for non-chat modes.
+   * Chat mode keeps text-only generation; agent/plan use this for tool loops.
+   */
+  agentic?: ModelAgenticContext
 }
 
 export interface ModelStreamChunk {
