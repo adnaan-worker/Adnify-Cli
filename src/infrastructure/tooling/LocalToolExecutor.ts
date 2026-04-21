@@ -259,10 +259,116 @@ export class LocalToolExecutor implements ToolExecutorPort {
       }
     }
 
+    if (action === 'update' || action === 'patch') {
+      const allowWrite = prompt.allowWrite === true
+      const oldText = typeof prompt.oldText === 'string' ? prompt.oldText : null
+      const newText = typeof prompt.newText === 'string' ? prompt.newText : null
+      const replaceAll = prompt.replaceAll === true
+      const expectedCount =
+        typeof prompt.expectedCount === 'number' && Number.isFinite(prompt.expectedCount)
+          ? Math.max(1, Math.trunc(prompt.expectedCount))
+          : replaceAll
+            ? undefined
+            : 1
+
+      if (!allowWrite) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content:
+            'Patch access requires explicit confirmation in the payload. Use {"action":"update","path":"...","oldText":"...","newText":"...","allowWrite":true}.',
+        }
+      }
+
+      if (oldText === null || newText === null) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: 'Missing required fields "oldText" and/or "newText" for file-ops update.',
+        }
+      }
+
+      if (!oldText) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: 'Field "oldText" cannot be empty for file-ops update.',
+        }
+      }
+
+      if (!isLikelyTextPath(resolvedPath)) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: 'Only text-like files can be patched in this build.',
+        }
+      }
+
+      try {
+        const fileInfo = await stat(resolvedPath)
+        if (!fileInfo.isFile()) {
+          return {
+            toolId: request.toolId,
+            ok: false,
+            content: 'The requested path is not a file.',
+          }
+        }
+
+        const currentContent = await readFile(resolvedPath, 'utf8')
+        const matchCount = countOccurrences(currentContent, oldText)
+
+        if (matchCount === 0) {
+          return {
+            toolId: request.toolId,
+            ok: false,
+            content: 'No matching content found for file-ops update.',
+          }
+        }
+
+        if (expectedCount !== undefined && matchCount !== expectedCount) {
+          return {
+            toolId: request.toolId,
+            ok: false,
+            content: `Expected ${expectedCount} match(es), but found ${matchCount}.`,
+          }
+        }
+
+        const nextContent = replaceAll
+          ? currentContent.split(oldText).join(newText)
+          : replaceFirst(currentContent, oldText, newText)
+
+        if (nextContent.length > MAX_FILE_WRITE_CHARS) {
+          return {
+            toolId: request.toolId,
+            ok: false,
+            content: `Patched content is too large. Limit: ${MAX_FILE_WRITE_CHARS} characters.`,
+          }
+        }
+
+        await writeFile(resolvedPath, nextContent, 'utf8')
+
+        const relativePath = relative(request.workspace.rootPath, resolvedPath) || '.'
+        return {
+          toolId: request.toolId,
+          ok: true,
+          content: [
+            `File updated: ${relativePath}`,
+            `Replacements: ${replaceAll ? matchCount : 1}`,
+          ].join('\n'),
+        }
+      } catch (error) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: error instanceof Error ? error.message : 'Failed to update the file.',
+        }
+      }
+    }
+
     return {
       toolId: request.toolId,
       ok: false,
-      content: 'Unsupported file-ops action. Supported: read, list, write.',
+      content: 'Unsupported file-ops action. Supported: read, list, write, update, patch.',
     }
   }
 
@@ -451,6 +557,36 @@ function isLikelyTextPath(filePath: string): boolean {
   }
 
   return normalizedName.startsWith('.')
+}
+
+function replaceFirst(content: string, oldText: string, newText: string): string {
+  const matchIndex = content.indexOf(oldText)
+  if (matchIndex === -1) {
+    return content
+  }
+
+  return (
+    content.slice(0, matchIndex) +
+    newText +
+    content.slice(matchIndex + oldText.length)
+  )
+}
+
+function countOccurrences(content: string, search: string): number {
+  let count = 0
+  let currentIndex = 0
+
+  while (currentIndex <= content.length) {
+    const matchIndex = content.indexOf(search, currentIndex)
+    if (matchIndex === -1) {
+      break
+    }
+
+    count += 1
+    currentIndex = matchIndex + search.length
+  }
+
+  return count
 }
 
 function validateReadonlyCommand(

@@ -145,4 +145,99 @@ describe('LocalToolExecutor', () => {
     expect(result.ok).toBe(false)
     expect(result.content).toContain('text-like files')
   })
+
+  test('should update a file with a single targeted replacement', async () => {
+    const executor = new LocalToolExecutor()
+    const targetPath = 'tmp-update-check.ts'
+
+    try {
+      await executor.execute({
+        toolId: 'file-ops',
+        input: `{"action":"write","path":"${targetPath}","content":"const value = 1;\\n","allowWrite":true}`,
+        workspace: createWorkspace(),
+      })
+
+      const result = await executor.execute({
+        toolId: 'file-ops',
+        input:
+          `{"action":"update","path":"${targetPath}","oldText":"const value = 1;","newText":"const value = 2;","allowWrite":true}`,
+        workspace: createWorkspace(),
+      })
+
+      expect(result.ok).toBe(true)
+      expect(result.content).toContain(`File updated: ${targetPath}`)
+
+      const readResult = await executor.execute({
+        toolId: 'file-ops',
+        input: `{"action":"read","path":"${targetPath}"}`,
+        workspace: createWorkspace(),
+      })
+
+      expect(readResult.ok).toBe(true)
+      expect(readResult.content).toContain('const value = 2;')
+    } finally {
+      await unlink(`E:/26Project/Adnify-Cli/${targetPath}`).catch(() => {})
+    }
+  })
+
+  test('should reject update when matches are ambiguous', async () => {
+    const executor = new LocalToolExecutor()
+    const targetPath = 'tmp-update-ambiguous.ts'
+
+    try {
+      await executor.execute({
+        toolId: 'file-ops',
+        input:
+          `{"action":"write","path":"${targetPath}","content":"item\\nitem\\n","allowWrite":true}`,
+        workspace: createWorkspace(),
+      })
+
+      const result = await executor.execute({
+        toolId: 'file-ops',
+        input:
+          `{"action":"update","path":"${targetPath}","oldText":"item","newText":"next","allowWrite":true}`,
+        workspace: createWorkspace(),
+      })
+
+      expect(result.ok).toBe(false)
+      expect(result.content).toContain('Expected 1 match')
+    } finally {
+      await unlink(`E:/26Project/Adnify-Cli/${targetPath}`).catch(() => {})
+    }
+  })
+
+  test('should patch all matches when replaceAll is enabled', async () => {
+    const executor = new LocalToolExecutor()
+    const targetPath = 'tmp-update-all.ts'
+
+    try {
+      await executor.execute({
+        toolId: 'file-ops',
+        input:
+          `{"action":"write","path":"${targetPath}","content":"a\\na\\na\\n","allowWrite":true}`,
+        workspace: createWorkspace(),
+      })
+
+      const result = await executor.execute({
+        toolId: 'file-ops',
+        input:
+          `{"action":"patch","path":"${targetPath}","oldText":"a","newText":"b","replaceAll":true,"allowWrite":true}`,
+        workspace: createWorkspace(),
+      })
+
+      expect(result.ok).toBe(true)
+      expect(result.content).toContain('Replacements: 3')
+
+      const readResult = await executor.execute({
+        toolId: 'file-ops',
+        input: `{"action":"read","path":"${targetPath}"}`,
+        workspace: createWorkspace(),
+      })
+
+      expect(readResult.ok).toBe(true)
+      expect(readResult.content).toContain('b\nb\nb')
+    } finally {
+      await unlink(`E:/26Project/Adnify-Cli/${targetPath}`).catch(() => {})
+    }
+  })
 })
