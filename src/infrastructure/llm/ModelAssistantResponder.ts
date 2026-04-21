@@ -195,8 +195,9 @@ export class ModelAssistantResponder implements AssistantResponderPort {
       '## Tool Calling Protocol',
       `When you need a tool, respond with exactly one ${'<adnify_tool_call name="tool-id">...</adnify_tool_call>'} block and nothing else.`,
       'The inner content must be valid JSON.',
+      'For shell-runner, use JSON like {"argv":["rg","query","src"]}.',
       'After the tool result is returned, continue the task normally.',
-      'Available executable tools in this build: workspace-read, search-index.',
+      'Available executable tools in this build: workspace-read, search-index, shell-runner.',
     ].join('\n')
   }
 }

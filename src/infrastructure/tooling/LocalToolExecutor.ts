@@ -34,6 +34,8 @@ export class LocalToolExecutor implements ToolExecutorPort {
         return this.executeWorkspaceRead(request)
       case 'search-index':
         return this.executeSearchIndex(request)
+      case 'shell-runner':
+        return this.executeShellRunner(request)
       default:
         return {
           toolId: request.toolId,
@@ -92,6 +94,56 @@ export class LocalToolExecutor implements ToolExecutorPort {
       toolId: request.toolId,
       ok: true,
       content: await this.fallbackSearch(request.workspace.rootPath, query, limit),
+    }
+  }
+
+  private async executeShellRunner(
+    request: ToolExecutionRequest,
+  ): Promise<ToolExecutionResult> {
+    const prompt = parseJsonObject(request.input)
+    const argv = Array.isArray(prompt.argv)
+      ? prompt.argv.filter((value): value is string => typeof value === 'string' && value.length > 0)
+      : []
+
+    if (argv.length === 0) {
+      return {
+        toolId: request.toolId,
+        ok: false,
+        content:
+          'Missing required field "argv". Example: {"argv":["rg","useCliController","src"]}',
+      }
+    }
+
+    const validation = validateReadonlyCommand(argv)
+    if (!validation.ok) {
+      return {
+        toolId: request.toolId,
+        ok: false,
+        content: validation.reason,
+      }
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync(argv[0]!, argv.slice(1), {
+        cwd: request.workspace.rootPath,
+        windowsHide: true,
+        maxBuffer: 1024 * 1024,
+      })
+
+      const output = [stdout.trim(), stderr.trim()].filter(Boolean).join('\n')
+      return {
+        toolId: request.toolId,
+        ok: true,
+        content: output || 'Command completed with no output.',
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Shell command execution failed.'
+      return {
+        toolId: request.toolId,
+        ok: false,
+        content: message,
+      }
     }
   }
 
@@ -201,5 +253,37 @@ function parseJsonObject(input: string): Record<string, unknown> {
       : {}
   } catch {
     return {}
+  }
+}
+
+function validateReadonlyCommand(
+  argv: string[],
+): { ok: true } | { ok: false; reason: string } {
+  const command = argv[0]?.toLowerCase()
+  if (!command) {
+    return { ok: false, reason: 'Missing command name.' }
+  }
+
+  if (command === 'rg') {
+    return { ok: true }
+  }
+
+  if (command === 'git') {
+    const subcommand = argv[1]?.toLowerCase()
+    const allowed = new Set(['status', 'diff', 'log', 'show', 'branch', 'rev-parse'])
+    if (!subcommand || !allowed.has(subcommand)) {
+      return {
+        ok: false,
+        reason:
+          'Only read-only git commands are allowed: status, diff, log, show, branch, rev-parse.',
+      }
+    }
+
+    return { ok: true }
+  }
+
+  return {
+    ok: false,
+    reason: 'Only read-only commands are allowed in this build. Supported: rg, git status/diff/log/show/branch/rev-parse.',
   }
 }
