@@ -7,7 +7,9 @@ export interface AssistantReply {
 }
 
 export interface AssistantStreamChunk {
+  kind?: 'text' | 'transcript'
   delta: string
+  transcript?: string
   done: boolean
 }
 

@@ -22,6 +22,7 @@ export interface SubmitPromptResult {
 
 export interface StreamingCallbacks {
   onChunk: (delta: string) => void
+  onTranscript?: (content: string) => void
   onDone: (fullContent: string) => void
   onError: (error: Error) => void
 }
@@ -108,6 +109,11 @@ export class SubmitPromptUseCase {
         toolCatalog: this.config.getToolCatalog(),
         abortSignal: command.abortSignal,
       })) {
+        if (chunk.transcript) {
+          session.addSystemMessage(this.idGenerator.next(), this.clock.now(), chunk.transcript)
+          callbacks.onTranscript?.(chunk.transcript)
+        }
+
         if (chunk.delta) {
           chunks.push(chunk.delta)
           callbacks.onChunk(chunk.delta)

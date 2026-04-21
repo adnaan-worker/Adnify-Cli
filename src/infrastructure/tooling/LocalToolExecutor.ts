@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { extname, join, relative, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -11,6 +11,8 @@ import type { ToolExecutorPort } from '../../application/ports/ToolExecutorPort'
 const execFileAsync = promisify(execFile)
 const DEFAULT_SEARCH_LIMIT = 8
 const MAX_SCAN_FILES = 200
+const MAX_DIRECTORY_ENTRIES = 40
+const MAX_FILE_READ_CHARS = 12_000
 const TEXT_EXTENSIONS = new Set([
   '.ts',
   '.tsx',
@@ -34,6 +36,8 @@ export class LocalToolExecutor implements ToolExecutorPort {
         return this.executeWorkspaceRead(request)
       case 'search-index':
         return this.executeSearchIndex(request)
+      case 'file-ops':
+        return this.executeFileOps(request)
       case 'shell-runner':
         return this.executeShellRunner(request)
       default:
@@ -94,6 +98,93 @@ export class LocalToolExecutor implements ToolExecutorPort {
       toolId: request.toolId,
       ok: true,
       content: await this.fallbackSearch(request.workspace.rootPath, query, limit),
+    }
+  }
+
+  private async executeFileOps(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
+    const prompt = parseJsonObject(request.input)
+    const action = typeof prompt.action === 'string' ? prompt.action.trim().toLowerCase() : 'read'
+    const rawPath = typeof prompt.path === 'string' ? prompt.path.trim() : '.'
+
+    const resolvedPath = resolveWorkspacePath(request.workspace.rootPath, rawPath)
+    if (!resolvedPath) {
+      return {
+        toolId: request.toolId,
+        ok: false,
+        content: 'Path must stay inside the current workspace.',
+      }
+    }
+
+    if (action === 'read') {
+      try {
+        const fileInfo = await stat(resolvedPath)
+        if (!fileInfo.isFile()) {
+          return {
+            toolId: request.toolId,
+            ok: false,
+            content: 'The requested path is not a file.',
+          }
+        }
+
+        const content = await readFile(resolvedPath, 'utf8')
+        const relativePath = relative(request.workspace.rootPath, resolvedPath) || '.'
+        const truncated =
+          content.length > MAX_FILE_READ_CHARS
+            ? `${content.slice(0, MAX_FILE_READ_CHARS)}\n\n[truncated]`
+            : content
+
+        return {
+          toolId: request.toolId,
+          ok: true,
+          content: [`File: ${relativePath}`, '', truncated].join('\n'),
+        }
+      } catch (error) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: error instanceof Error ? error.message : 'Failed to read the file.',
+        }
+      }
+    }
+
+    if (action === 'list') {
+      try {
+        const directoryInfo = await stat(resolvedPath)
+        if (!directoryInfo.isDirectory()) {
+          return {
+            toolId: request.toolId,
+            ok: false,
+            content: 'The requested path is not a directory.',
+          }
+        }
+
+        const entries = await readdir(resolvedPath, { withFileTypes: true })
+        const lines = entries
+          .filter((entry) => entry.name !== '.git' && entry.name !== 'node_modules')
+          .slice(0, MAX_DIRECTORY_ENTRIES)
+          .map((entry) => `${entry.isDirectory() ? 'dir ' : 'file'} ${entry.name}`)
+
+        return {
+          toolId: request.toolId,
+          ok: true,
+          content: [
+            `Directory: ${relative(request.workspace.rootPath, resolvedPath) || '.'}`,
+            ...lines,
+          ].join('\n'),
+        }
+      } catch (error) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: error instanceof Error ? error.message : 'Failed to list the directory.',
+        }
+      }
+    }
+
+    return {
+      toolId: request.toolId,
+      ok: false,
+      content: 'Unsupported file-ops action. Supported: read, list.',
     }
   }
 
@@ -254,6 +345,19 @@ function parseJsonObject(input: string): Record<string, unknown> {
   } catch {
     return {}
   }
+}
+
+function resolveWorkspacePath(rootPath: string, candidatePath: string): string | null {
+  const workspaceRoot = resolve(rootPath)
+  const nextPath = resolve(workspaceRoot, candidatePath || '.')
+
+  if (nextPath === workspaceRoot) {
+    return nextPath
+  }
+
+  return nextPath.startsWith(`${workspaceRoot}\\`) || nextPath.startsWith(`${workspaceRoot}/`)
+    ? nextPath
+    : null
 }
 
 function validateReadonlyCommand(

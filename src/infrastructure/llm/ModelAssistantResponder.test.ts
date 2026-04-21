@@ -205,6 +205,7 @@ describe('ModelAssistantResponder', () => {
     })
 
     const chunks: string[] = []
+    const transcripts: string[] = []
     for await (const chunk of responder.streamReply({
       prompt: 'find where the input controller lives',
       session,
@@ -216,10 +217,16 @@ describe('ModelAssistantResponder', () => {
       }),
       toolCatalog: [],
     })) {
+      if (chunk.transcript) {
+        transcripts.push(chunk.transcript)
+      }
       chunks.push(chunk.delta)
     }
 
     expect(chunks.join('')).toBe('Final answer after using the tool.')
+    expect(transcripts).toHaveLength(2)
+    expect(transcripts[0]).toContain('search-index')
+    expect(transcripts[1]).toContain('tool output for search-index')
     expect(capturedRequests).toHaveLength(2)
     expect(capturedRequests[1]?.messages[capturedRequests[1].messages.length - 1]?.content).toContain(
       'Tool result for search-index:',

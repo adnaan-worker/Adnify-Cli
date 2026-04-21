@@ -38,10 +38,10 @@ export class StubAssistantResponder implements AssistantResponderPort {
       if (command.abortSignal?.aborted) {
         throw new Error('Request aborted')
       }
-      yield { delta: word, done: false }
+      yield { kind: 'text', delta: word, done: false }
     }
 
-    yield { delta: '', done: true }
+    yield { kind: 'text', delta: '', done: true }
   }
 
   private buildReplyContent(command: AssistantResponderCommand): string {

@@ -51,4 +51,44 @@ describe('LocalToolExecutor', () => {
     expect(result.content).toContain('Focus: layout')
     expect(result.content).toContain('Package manager: bun')
   })
+
+  test('should list a directory for file-ops', async () => {
+    const executor = new LocalToolExecutor()
+
+    const result = await executor.execute({
+      toolId: 'file-ops',
+      input: '{"action":"list","path":"src"}',
+      workspace: createWorkspace(),
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.content).toContain('Directory: src')
+  })
+
+  test('should read a file for file-ops', async () => {
+    const executor = new LocalToolExecutor()
+
+    const result = await executor.execute({
+      toolId: 'file-ops',
+      input: '{"action":"read","path":"package.json"}',
+      workspace: createWorkspace(),
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.content).toContain('File: package.json')
+    expect(result.content).toContain('"name": "adnify-cli"')
+  })
+
+  test('should reject file-ops paths outside the workspace', async () => {
+    const executor = new LocalToolExecutor()
+
+    const result = await executor.execute({
+      toolId: 'file-ops',
+      input: '{"action":"read","path":"../secret.txt"}',
+      workspace: createWorkspace(),
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.content).toContain('inside the current workspace')
+  })
 })

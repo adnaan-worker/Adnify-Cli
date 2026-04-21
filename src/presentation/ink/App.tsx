@@ -1,4 +1,5 @@
 import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
+import { useMemo } from 'react'
 import type { AdnifyCliRuntime } from '../../application/dto/AdnifyCliRuntime'
 import { adnifyTheme } from './theme'
 import { ActivityPulse } from './components/ActivityPulse'
@@ -38,7 +39,10 @@ export function App(props: AppProps) {
   const workspaceName = workspace
     ? workspace.rootPath.split(/[\\/]/).filter(Boolean).pop() ?? workspace.rootPath
     : i18n.t('app.boot.workspaceName')
-  const messages = session?.getRecentMessages(24) ?? []
+  const messages = useMemo(
+    () => [...(session?.getRecentMessages(24) ?? []), ...controller.streamingMessages],
+    [controller.streamingMessages, session],
+  )
   const showEmptyState =
     Boolean(session) &&
     messages.length === 0 &&

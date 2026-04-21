@@ -98,8 +98,8 @@ function createMockResponder(reply: string): AssistantResponderPort {
   return {
     generateReply: async (): Promise<AssistantReply> => ({ content: reply }),
     async *streamReply(): AsyncIterable<AssistantStreamChunk> {
-      yield { delta: reply, done: false }
-      yield { delta: '', done: true }
+      yield { kind: 'text', delta: reply, done: false }
+      yield { kind: 'text', delta: '', done: true }
     },
   }
 }
@@ -250,7 +250,7 @@ describe('SubmitPromptUseCase', () => {
     const errorResponder: AssistantResponderPort = {
       generateReply: async () => ({ content: '' }),
       async *streamReply() {
-        yield { delta: 'partial', done: false }
+        yield { kind: 'text', delta: 'partial', done: false }
         throw new Error('network interrupted')
       },
     }
@@ -301,12 +301,12 @@ describe('SubmitPromptUseCase', () => {
     const abortAwareResponder: AssistantResponderPort = {
       generateReply: async () => ({ content: '' }),
       async *streamReply(command) {
-        yield { delta: 'partial ', done: false }
+        yield { kind: 'text', delta: 'partial ', done: false }
         await new Promise((resolve) => setTimeout(resolve, 10))
         if (command.abortSignal?.aborted) {
           throw new Error('Request aborted')
         }
-        yield { delta: 'tail', done: true }
+        yield { kind: 'text', delta: 'tail', done: true }
       },
     }
 
@@ -341,5 +341,62 @@ describe('SubmitPromptUseCase', () => {
     expect(result.statusLine).toBe('Current execution aborted.')
     const messages = result.session.getMessages()
     expect(messages[messages.length - 1]?.content).toContain('partial')
+  })
+
+  test('executeStreaming should persist transcript chunks as system messages', async () => {
+    const repo = createMockSessionRepo()
+    const session = ConversationSession.create({
+      id: 'sess-6',
+      title: 'test',
+      mode: 'agent',
+      workspacePath: '/test',
+      createdAt: new Date('2026-01-01'),
+    })
+    await repo.save(session)
+
+    const transcriptResponder: AssistantResponderPort = {
+      generateReply: async () => ({ content: '' }),
+      async *streamReply() {
+        yield {
+          kind: 'transcript',
+          delta: '',
+          transcript: '<adnify-notice title="tools" tone="info">running tool</adnify-notice>',
+          done: false,
+        }
+        yield { kind: 'text', delta: 'done', done: false }
+        yield { kind: 'text', delta: '', done: true }
+      },
+    }
+
+    const useCase = new SubmitPromptUseCase(
+      repo,
+      createMockWorkspace(),
+      transcriptResponder,
+      createMockConfig(),
+      createMockIdGenerator(),
+      createMockClock(new Date('2026-01-01T00:01:00Z')),
+      createMockLogger(),
+      createAppI18n('en'),
+    )
+
+    const transcripts: string[] = []
+    const result = await useCase.executeStreaming(
+      { sessionId: 'sess-6', prompt: 'run tool' },
+      {
+        onChunk: () => {},
+        onTranscript: (content) => {
+          transcripts.push(content)
+        },
+        onDone: () => {},
+        onError: () => {},
+      },
+    )
+
+    expect(transcripts).toHaveLength(1)
+    const messages = result.session.getMessages()
+    expect(messages).toHaveLength(3)
+    expect(messages[1]?.role).toBe('system')
+    expect(messages[1]?.content).toContain('running tool')
+    expect(messages[2]?.content).toBe('done')
   })
 })

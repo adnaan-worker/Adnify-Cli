@@ -4,6 +4,7 @@ import type { BootstrapSnapshot } from '../../../application/dto/BootstrapSnapsh
 import type { SessionListItem } from '../../../application/dto/SessionListItem'
 import type { AdnifyCliRuntime } from '../../../application/dto/AdnifyCliRuntime'
 import type { ConversationSession } from '../../../domain/session/aggregates/ConversationSession'
+import { ConversationMessage } from '../../../domain/session/entities/ConversationMessage'
 import type { CommandSuggestionItem } from '../components/CommandSuggestionList'
 import { useConfigInit } from './useConfigInit'
 
@@ -19,6 +20,7 @@ export interface CliControllerState {
   inputValue: string
   statusLine: string
   streamingText: string
+  streamingMessages: ConversationMessage[]
   isBooting: boolean
   isBusy: boolean
   configInitPrompt: string
@@ -79,6 +81,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
   const [inputValue, setInputValue] = useState('')
   const [statusLine, setStatusLine] = useState(i18n.t('status.initializing'))
   const [streamingText, setStreamingText] = useState('')
+  const [streamingMessages, setStreamingMessages] = useState<ConversationMessage[]>([])
   const [isBooting, setIsBooting] = useState(true)
   const [isBusy, setIsBusy] = useState(false)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
@@ -137,6 +140,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
 
     streamingBufferRef.current = ''
     setStreamingText('')
+    setStreamingMessages([])
   }, [])
 
   useEffect(() => {
@@ -435,6 +439,17 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
           onDone: () => {
             flushStreamingBuffer()
           },
+          onTranscript: (content) => {
+            setStreamingMessages((previous) => [
+              ...previous,
+              new ConversationMessage({
+                id: `stream-${Date.now()}-${previous.length + 1}`,
+                role: 'system',
+                content,
+                createdAt: new Date(),
+              }),
+            ])
+          },
           onError: (error) => {
             flushStreamingBuffer()
             setStatusLine(
@@ -605,6 +620,7 @@ export function useCliController(params: UseCliControllerParams): CliControllerS
     inputValue,
     statusLine,
     streamingText,
+    streamingMessages,
     isBooting,
     isBusy,
     configInitPrompt: configInit.isActive
