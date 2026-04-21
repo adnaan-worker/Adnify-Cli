@@ -1,5 +1,5 @@
-import { readFile, readdir, stat } from 'node:fs/promises'
-import { extname, join, relative, resolve } from 'node:path'
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { dirname, extname, join, relative, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type {
@@ -13,6 +13,7 @@ const DEFAULT_SEARCH_LIMIT = 8
 const MAX_SCAN_FILES = 200
 const MAX_DIRECTORY_ENTRIES = 40
 const MAX_FILE_READ_CHARS = 12_000
+const MAX_FILE_WRITE_CHARS = 80_000
 const TEXT_EXTENSIONS = new Set([
   '.ts',
   '.tsx',
@@ -27,6 +28,24 @@ const TEXT_EXTENSIONS = new Set([
   '.css',
   '.scss',
   '.html',
+  '.sh',
+  '.ps1',
+  '.env',
+])
+const ALLOWED_TEXT_FILENAMES = new Set([
+  'readme',
+  'license',
+  '.gitignore',
+  '.gitattributes',
+  '.npmrc',
+  '.prettierrc',
+  '.prettierignore',
+  '.eslintrc',
+  '.eslintignore',
+  '.editorconfig',
+  '.env',
+  '.env.example',
+  '.rules',
 ])
 
 export class LocalToolExecutor implements ToolExecutorPort {
@@ -181,10 +200,69 @@ export class LocalToolExecutor implements ToolExecutorPort {
       }
     }
 
+    if (action === 'write') {
+      const content = typeof prompt.content === 'string' ? prompt.content : null
+      const allowWrite = prompt.allowWrite === true
+
+      if (!allowWrite) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content:
+            'Write access requires explicit confirmation in the payload. Use {"action":"write","path":"...","content":"...","allowWrite":true}.',
+        }
+      }
+
+      if (content === null) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: 'Missing required field "content" for file-ops write.',
+        }
+      }
+
+      if (!isLikelyTextPath(resolvedPath)) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: 'Only text-like files can be written in this build.',
+        }
+      }
+
+      if (content.length > MAX_FILE_WRITE_CHARS) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: `Write content is too large. Limit: ${MAX_FILE_WRITE_CHARS} characters.`,
+        }
+      }
+
+      try {
+        await mkdir(dirname(resolvedPath), { recursive: true })
+        await writeFile(resolvedPath, content, 'utf8')
+
+        const relativePath = relative(request.workspace.rootPath, resolvedPath) || '.'
+        return {
+          toolId: request.toolId,
+          ok: true,
+          content: [
+            `File written: ${relativePath}`,
+            `Characters: ${content.length}`,
+          ].join('\n'),
+        }
+      } catch (error) {
+        return {
+          toolId: request.toolId,
+          ok: false,
+          content: error instanceof Error ? error.message : 'Failed to write the file.',
+        }
+      }
+    }
+
     return {
       toolId: request.toolId,
       ok: false,
-      content: 'Unsupported file-ops action. Supported: read, list.',
+      content: 'Unsupported file-ops action. Supported: read, list, write.',
     }
   }
 
@@ -358,6 +436,21 @@ function resolveWorkspacePath(rootPath: string, candidatePath: string): string |
   return nextPath.startsWith(`${workspaceRoot}\\`) || nextPath.startsWith(`${workspaceRoot}/`)
     ? nextPath
     : null
+}
+
+function isLikelyTextPath(filePath: string): boolean {
+  const normalizedName = filePath.split(/[\\/]/).pop()?.toLowerCase() ?? ''
+  const extension = extname(normalizedName)
+
+  if (TEXT_EXTENSIONS.has(extension)) {
+    return true
+  }
+
+  if (ALLOWED_TEXT_FILENAMES.has(normalizedName)) {
+    return true
+  }
+
+  return normalizedName.startsWith('.')
 }
 
 function validateReadonlyCommand(

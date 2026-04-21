@@ -7,3 +7,4 @@ riskLevel: careful
 
 Read, edit, create, and refactor repository files while preserving project structure and user intent.
 Prefer minimal targeted edits, avoid unrelated rewrites, and keep comments meaningful.
+For write actions, always include `allowWrite: true` explicitly and only modify text-like files inside the current workspace.

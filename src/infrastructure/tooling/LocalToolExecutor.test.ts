@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { unlink } from 'node:fs/promises'
 import { LocalToolExecutor } from './LocalToolExecutor'
 import { WorkspaceContext } from '../../domain/workspace/entities/WorkspaceContext'
 
@@ -90,5 +91,58 @@ describe('LocalToolExecutor', () => {
 
     expect(result.ok).toBe(false)
     expect(result.content).toContain('inside the current workspace')
+  })
+
+  test('should require explicit allowWrite flag for file-ops write', async () => {
+    const executor = new LocalToolExecutor()
+
+    const result = await executor.execute({
+      toolId: 'file-ops',
+      input: '{"action":"write","path":"tmp-write-check.txt","content":"hello"}',
+      workspace: createWorkspace(),
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.content).toContain('allowWrite')
+  })
+
+  test('should write a text file for file-ops when explicitly allowed', async () => {
+    const executor = new LocalToolExecutor()
+    const targetPath = 'tmp-write-check.txt'
+
+    try {
+      const result = await executor.execute({
+        toolId: 'file-ops',
+        input: `{"action":"write","path":"${targetPath}","content":"hello from tool","allowWrite":true}`,
+        workspace: createWorkspace(),
+      })
+
+      expect(result.ok).toBe(true)
+      expect(result.content).toContain(`File written: ${targetPath}`)
+
+      const readResult = await executor.execute({
+        toolId: 'file-ops',
+        input: `{"action":"read","path":"${targetPath}"}`,
+        workspace: createWorkspace(),
+      })
+
+      expect(readResult.ok).toBe(true)
+      expect(readResult.content).toContain('hello from tool')
+    } finally {
+      await unlink(`E:/26Project/Adnify-Cli/${targetPath}`).catch(() => {})
+    }
+  })
+
+  test('should reject binary-like file writes in this build', async () => {
+    const executor = new LocalToolExecutor()
+
+    const result = await executor.execute({
+      toolId: 'file-ops',
+      input: '{"action":"write","path":"image.png","content":"fake","allowWrite":true}',
+      workspace: createWorkspace(),
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.content).toContain('text-like files')
   })
 })
