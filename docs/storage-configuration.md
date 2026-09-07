@@ -46,11 +46,14 @@ Shape:
   "dataDirectory": "D:/MyData/Adnify-Cli",
   "locale": "zh-CN",
   "animationLevel": "full",
-  "permissionMode": "workspace"
+  "permissionMode": "workspace",
+  "shellAllowlist": ["cargo", "make", "docker"]
 }
 ```
 
 `dataDirectory` is only honored when `ADNIFY_HOME` is not set — the environment variable always wins (see resolution order below).
+
+`shellAllowlist` extends the `shell-runner` whitelist with your own commands. Listed commands are classified as careful and **still require approval** before execution; changes take effect on the next startup.
 
 ## Data Root Resolution Order
 

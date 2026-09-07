@@ -49,6 +49,7 @@
 
 - **流式响应** — 实时输出，终端渲染稳定低抖动
 - **会话持久化** — 每个工作区独立保存，启动自动恢复上次会话，关了终端不丢上下文
+- **原子化本地持久化** — 配置、会话与设置的写入采用临时文件 + 重命名，进程中断也不会损坏数据
 - **工具调用闭环** — 8 个内置工具 + 动态 MCP 工具，过程与结果实时回流会话区
 - **并行研究子代理** — `explore` / `review` / `test` / `general` 专职角色，隔离上下文并安全使用只读代码工具
 - **写入后即时诊断** — TypeScript 错误在文件落盘当刻即被捕获并回传模型，同一轮对话内自动修复
@@ -90,9 +91,9 @@
 | `search-index` | 基于 ripgrep 的代码检索（无 rg 时回退到内置扫描） | 🟢 safe |
 | `glob-search` | 基于通配符的文件匹配 | 🟢 safe |
 | `file-ops` | `read` / `list` / `write` / `update` / `patch` / `multi-patch`(原子多段替换) | 🟢 读取 safe · 🟡 写入 careful |
-| `shell-runner` | 白名单命令执行 | 🟢 只读 safe · 🟡 验证类 careful |
+| `shell-runner` | 白名单命令执行，可通过 settings.json 的 `"shellAllowlist"` 扩展（仍需审批） | 🟢 只读 safe · 🟡 验证类 careful |
 | `web-search` | 基于 DuckDuckGo 的公开网络搜索（无需 API key） | 🟡 careful |
-| `web-fetch` | 获取并提取 URL 页面的文本内容 | 🟡 careful |
+| `web-fetch` | 获取并提取 URL 页面的文本内容（下载上限 2 MB） | 🟡 careful |
 | `task` | 并行派发最多 8 个子任务，进度回传会话区 | 🟡 careful |
 | `mcp__*` | 调用已连接 MCP 服务器提供的工具 | 🟡 careful |
 

@@ -46,11 +46,14 @@ Adnify-Cli 是本地优先的工具:它持久化的每一个字节——会话�
   "dataDirectory": "D:/MyData/Adnify-Cli",
   "locale": "zh-CN",
   "animationLevel": "full",
-  "permissionMode": "workspace"
+  "permissionMode": "workspace",
+  "shellAllowlist": ["cargo", "make", "docker"]
 }
 ```
 
 仅当未设置 `ADNIFY_HOME` 时 `dataDirectory` 才生效——环境变量永远优先(见下方解析顺序)。
+
+`shellAllowlist` 用于扩展 `shell-runner` 白名单。列入的命令按 careful 分级,**执行前仍需审批**;修改后重启生效。
 
 ## 数据根目录解析顺序
 

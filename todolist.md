@@ -175,6 +175,16 @@
 
 ## 最近更新
 
+### 2026-08-25（v0.1.2 稳定性加固）
+
+- `atomicWriteFile`（临时文件 + rename）：config、session、settings 持久化全部改为原子写入，进程中断不再产生半截损坏文件
+- CI verify 工作流升级为 ubuntu-latest + windows-latest 双矩阵
+- settings.json 新增 `shellAllowlist`：用户可自行扩展 shell 白名单命令，按 careful 分级仍需审批；启动时由 createRuntime 注入一次，运行期修改需重启生效
+- `web-fetch` 增加下载上限（2 MB，正文超长截断到 2 万字符），超大响应不再耗尽内存
+- `main()` 启动错误捕获并报告，避免静默 unhandled rejection 退出
+- 版本号 bump 至 0.1.2；README 双语补充原子写入、用户白名单与 webFetch 限制说明
+- 当前测试状态：`366 pass / 0 fail`（52 个文件），typecheck 通过
+
 ### 2026-08-25
 
 **v0.1.1 发版收口**

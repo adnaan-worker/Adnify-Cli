@@ -2,6 +2,19 @@
 
 All notable changes to Adnify CLI are documented in this file.
 
+## 0.1.2 - 2026-08-25
+
+### Added
+
+- Windows CI: the verify workflow now runs on an ubuntu-latest + windows-latest matrix.
+- User-extended shell command allowlist via `"shellAllowlist"` in settings.json — user-listed commands are classified as careful and still require approval.
+
+### Improved
+
+- Atomic file writes (temp file + rename) for config, session, and settings persistence, preventing corrupted files when the process is interrupted mid-write.
+- `web-fetch` enforces a 2 MB download cap with a 20k-character text truncation, so oversized responses cannot exhaust memory.
+- Startup errors in `main()` are caught and reported instead of exiting as a silent unhandled rejection.
+
 ## 0.1.1 - 2026-08-25
 
 ### Added

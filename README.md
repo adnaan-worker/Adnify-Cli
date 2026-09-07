@@ -50,6 +50,7 @@ Runs locally. Your data never leaves your machine. Works with OpenAI, Anthropic,
 - **Immediate Activity Feedback** — Your message and working indicator render before memory lookup or the first API response
 - **Streaming Responses** — Real-time output with stable, low-jitter terminal rendering
 - **Session Persistence** — Per-workspace session files, auto-restore on startup — never lose context when closing the terminal
+- **Atomic Local Persistence** — Config, session, and settings writes go through temp-file + rename, so an interrupted write never corrupts your data
 - **Closed-Loop Tool Calling** — 8 built-in tools + dynamic MCP tools, with progress and results streaming back in real time
 - **Parallel Coding Sub-agents** — research roles stay read-only; `implement` workers edit and verify in disposable detached Git worktrees and return reviewable patches
 - **Keyboard Choice Flows** — approvals, setup, permission modes, and model questions use reusable arrow-key tabs instead of numeric or y/n input
@@ -100,9 +101,9 @@ Runs locally. Your data never leaves your machine. Works with OpenAI, Anthropic,
 | `search-index` | ripgrep-based code search (falls back to built-in scanner) | 🟢 safe |
 | `glob-search` | Glob-pattern file matching | 🟢 safe |
 | `file-ops` | `read` / `list` / `write` / `update` / `patch` / `multi-patch` (atomic hunks) | 🟢 read safe · 🟡 write careful |
-| `shell-runner` | Whitelist command execution | 🟢 read-only safe · 🟡 verification careful |
+| `shell-runner` | Whitelist command execution, extensible via `"shellAllowlist"` in settings.json (still requires approval) | 🟢 read-only safe · 🟡 verification careful |
 | `web-search` | DuckDuckGo public web search (no API key needed) | 🟡 careful |
-| `web-fetch` | Fetch and extract text from an HTTP(S) URL | 🟡 careful |
+| `web-fetch` | Fetch and extract text from an HTTP(S) URL, with a 2 MB download cap | 🟡 careful |
 | `task` | Dispatch up to 8 parallel subtasks with progress streaming | 🟡 careful |
 | `mcp__*` | Invoke tools from connected MCP servers | 🟡 careful |
 
